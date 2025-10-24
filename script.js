@@ -165,7 +165,6 @@ toggleStats.addEventListener("click", () => {
     : "📉 Hide Stats";
   if (!statsPanel.classList.contains("hidden")) updateStats();
 });
-
 function updateStats() {
   const cleanWords = words.filter((w) => {
     if (!w.jlpt) return false;
@@ -177,52 +176,126 @@ function updateStats() {
   });
 
   const total = cleanWords.length;
+
+  // Categorize by JLPT and familiarity type
   const familiarityGroups = cleanWords.reduce((acc, w) => {
     const jlpt = w.jlpt
       .toUpperCase()
       .replace(/[^N\d]/g, "")
       .trim();
-    acc[jlpt] = acc[jlpt] || { total: 0, learned: 0 };
+    acc[jlpt] = acc[jlpt] || {
+      total: 0,
+      well_known: 0,
+      known: 0,
+      explored: 0,
+      unknown: 0,
+    };
+
     acc[jlpt].total++;
-    if (["known", "well_known"].includes(w.familiarity)) acc[jlpt].learned++;
+    acc[jlpt][w.familiarity] = (acc[jlpt][w.familiarity] || 0) + 1;
+
     return acc;
   }, {});
 
-  const learnedTotal = Object.values(familiarityGroups).reduce(
-    (a, b) => a + b.learned,
-    0
+  // Overall totals
+  const totals = Object.values(familiarityGroups).reduce(
+    (acc, g) => {
+      acc.total += g.total;
+      acc.well_known += g.well_known;
+      acc.known += g.known;
+      acc.explored += g.explored;
+      acc.unknown += g.unknown;
+      return acc;
+    },
+    { total: 0, well_known: 0, known: 0, explored: 0, unknown: 0 }
   );
-  const percent = ((learnedTotal / total) * 100).toFixed(1);
+
+  const percentLearned = (
+    ((totals.well_known + totals.known + totals.explored) / totals.total) *
+    100
+  ).toFixed(1);
 
   const validLevels = ["N1", "N2", "N3", "N4", "N5"];
 
+  // HTML build
   statsContainer.innerHTML = `
     <div class="stats-card">
       <h2>Total Progress</h2>
-      <p>${learnedTotal} / ${total} words learned</p>
-      <div class="progress-bar">
-        <div class="progress-fill" style="width: ${percent}%"></div>
+      <p>${totals.well_known + totals.known + totals.explored} / ${
+    totals.total
+  } words studied</p>
+
+      <div class="progress-bar multi animate">
+        <div class="segment well_known" style="width:${(
+          (totals.well_known / totals.total) *
+          100
+        ).toFixed(1)}%"></div>
+        <div class="segment known" style="width:${(
+          (totals.known / totals.total) *
+          100
+        ).toFixed(1)}%"></div>
+        <div class="segment explored" style="width:${(
+          (totals.explored / totals.total) *
+          100
+        ).toFixed(1)}%"></div>
+        <div class="segment unknown" style="width:${(
+          (totals.unknown / totals.total) *
+          100
+        ).toFixed(1)}%"></div>
       </div>
+
+      <p class="legend">
+        🌈 ${totals.well_known} well known • 🟩 ${totals.known} known • 🟦 ${
+    totals.explored
+  } explored • ⚪ ${totals.unknown} unknown
+      </p>
     </div>
 
     ${validLevels
-      .filter((level) => familiarityGroups[level])
-      .map((level) => {
-        const group = familiarityGroups[level];
-        const pct = ((group.learned / group.total) * 100).toFixed(1);
+      .filter((lvl) => familiarityGroups[lvl])
+      .map((lvl) => {
+        const g = familiarityGroups[lvl];
+        const learnedPct = (
+          ((g.well_known + g.known + g.explored) / g.total) *
+          100
+        ).toFixed(1);
+
         return `
-          <div class="stats-card">
-            <h3>${level}</h3>
-            <p>${group.learned} / ${group.total} learned</p>
-            <div class="progress-bar">
-              <div class="progress-fill" style="width:${pct}%"></div>
-            </div>
+        <div class="stats-card">
+          <h3>${lvl}</h3>
+          <p>${g.well_known + g.known + g.explored} / ${
+          g.total
+        } studied (${learnedPct}%)</p>
+
+          <div class="progress-bar multi animate">
+            <div class="segment well_known" style="width:${(
+              (g.well_known / g.total) *
+              100
+            ).toFixed(1)}%"></div>
+            <div class="segment known" style="width:${(
+              (g.known / g.total) *
+              100
+            ).toFixed(1)}%"></div>
+            <div class="segment explored" style="width:${(
+              (g.explored / g.total) *
+              100
+            ).toFixed(1)}%"></div>
+            <div class="segment unknown" style="width:${(
+              (g.unknown / g.total) *
+              100
+            ).toFixed(1)}%"></div>
           </div>
-        `;
+
+          <p class="legend">
+            🌈 ${g.well_known} well known • 🟩 ${g.known} known • 🟦 ${
+          g.explored
+        } explored • ⚪ ${g.unknown} unknown
+          </p>
+        </div>`;
       })
       .join("")}
 
-    <div class="motivation">${getMotivationMessage(percent)}</div>
+    <div class="motivation">${getMotivationMessage(percentLearned)}</div>
   `;
 }
 

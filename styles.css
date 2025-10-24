@@ -135,3 +135,100 @@ footer button {
   margin-top: 1rem;
   font-size: 1.1rem;
 }
+
+.progress-bar.multi {
+  display: flex;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: 6px;
+  background: #e6e6e6;
+}
+
+.segment {
+  height: 100%;
+  transition: width 1s ease-in-out;
+}
+
+/* 🌈 Well Known = satisfying gradient glow */
+.segment.well_known {
+  background: linear-gradient(90deg, #ff6ec7, #f9ce34, #00c3ff);
+}
+
+/* 🟩 Known = growth green */
+.segment.known {
+  background: #22c55e;
+}
+
+/* 🟦 Explored = calm discovery blue */
+.segment.explored {
+  background: #3b82f6;
+}
+
+/* ⚪ Unknown = neutral grey */
+.segment.unknown {
+  background: #bdbdbd;
+}
+
+.legend {
+  font-size: 0.9em;
+  color: #444;
+  margin-top: 0.5rem;
+  text-align: left;
+}
+/* --- Progress Glow Animation --- */
+@keyframes glowPulse {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* 🌈 Well Known = animated gradient glow */
+.segment.well_known {
+  background: linear-gradient(90deg, #ff61d2, #fe9090, #ffdd00, #a2f7ff);
+  background-size: 300% 300%;
+  animation: glowPulse 6s ease-in-out infinite;
+  filter: brightness(1.05);
+}
+
+/* 🟩 Known = balanced green (growth) */
+.segment.known {
+  background: #22c55e;
+}
+
+/* 🟦 Explored = tranquil discovery blue */
+.segment.explored {
+  background: #3b82f6;
+}
+
+/* ⚪ Unknown = neutral grey */
+.segment.unknown {
+  background: #bdbdbd;
+}
+
+.progress-bar.multi {
+  display: flex;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: 6px;
+  background: #e6e6e6;
+}
+
+.segment {
+  height: 100%;
+  transition: width 1s ease-in-out;
+}
+
+.legend {
+  font-size: 0.9em;
+  color: #444;
+  margin-top: 0.5rem;
+  text-align: left;
+}
