@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JLPT Vocabulary Tracker</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>JLPT Vocabulary Tracker</h1>
+
+      <div class="controls">
+        <label for="jlptFilter">JLPT Level:</label>
+        <select id="jlptFilter">
+          <option value="all">All</option>
+          <option value="N1">N1</option>
+          <option value="N2">N2</option>
+          <option value="N3">N3</option>
+          <option value="N4">N4</option>
+          <option value="N5">N5</option>
+        </select>
+
+        <label for="familiarityFilter">Familiarity:</label>
+        <select id="familiarityFilter">
+          <option value="all">All</option>
+          <option value="well_known">Well Known</option>
+          <option value="known">Known</option>
+          <option value="explored">Explored</option>
+          <option value="unknown">Unknown</option>
+        </select>
+
+        <button id="resetProgress">🔄 Reset Progress</button>
+        <button id="toggleStats">📊 Show Stats</button>
+      </div>
+    </header>
+
+    <!-- Stats panel now outside controls for proper visibility -->
+    <section id="statsPanel" class="hidden">
+      <div id="statsContainer"></div>
+    </section>
+
+    <main id="wordGrid"></main>
+
+    <footer>
+      <button id="prevPage">Prev</button>
+      <span id="pageInfo"></span>
+      <button id="nextPage">Next</button>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
