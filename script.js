@@ -8,6 +8,16 @@ const jlptFilter = document.getElementById("jlptFilter");
 const familiarityFilter = document.getElementById("familiarityFilter");
 const prevBtn = document.getElementById("prevPage");
 const nextBtn = document.getElementById("nextPage");
+const todayChip = document.getElementById("todayChip");
+
+// Stats panel refs
+const statsPanel = document.getElementById("statsPanel");
+const statsContainer = document.getElementById("statsContainer");
+const toggleStats = document.getElementById("toggleStats");
+
+const LS_PROGRESS = "vocabProgress"; // word familiarity map
+const LS_DAILY = "vocabProgressDaily"; // { "YYYY-MM-DD": number }
+const RANK = { unknown: 0, explored: 1, known: 2, well_known: 3 };
 
 document.addEventListener("DOMContentLoaded", async () => {
   await loadCSV();
@@ -21,7 +31,63 @@ document.addEventListener("DOMContentLoaded", async () => {
   document
     .getElementById("resetProgress")
     .addEventListener("click", resetProgress);
+
+  toggleStats.addEventListener("click", () => {
+    statsPanel.classList.toggle("hidden");
+    toggleStats.textContent = statsPanel.classList.contains("hidden")
+      ? "📊 Show Stats"
+      : "📉 Hide Stats";
+    if (!statsPanel.classList.contains("hidden")) updateStats();
+  });
+
+  // Ensure today bucket exists for the chip
+  ensureTodayBucket();
+  updateTodayChip();
 });
+
+function todayKey() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const da = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${da}`; // local date
+}
+
+function getDailyLog() {
+  try {
+    return JSON.parse(localStorage.getItem(LS_DAILY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function setDailyLog(log) {
+  localStorage.setItem(LS_DAILY, JSON.stringify(log));
+}
+
+function ensureTodayBucket() {
+  const log = getDailyLog();
+  const t = todayKey();
+  if (log[t] == null) {
+    log[t] = 0;
+    setDailyLog(log);
+  }
+}
+
+function addDailyProgress(delta) {
+  if (delta <= 0) return;
+  const log = getDailyLog();
+  const t = todayKey();
+  log[t] = (log[t] || 0) + delta;
+  setDailyLog(log);
+  updateTodayChip();
+}
+
+function updateTodayChip() {
+  const log = getDailyLog();
+  const t = todayKey();
+  todayChip.textContent = `Progress Points Today: ${log[t] || 0}`;
+}
 
 function resetProgress() {
   if (
@@ -29,8 +95,11 @@ function resetProgress() {
       "Are you sure you want to reset all progress? This cannot be undone."
     )
   ) {
-    localStorage.removeItem("vocabProgress");
+    localStorage.removeItem(LS_PROGRESS);
+    localStorage.removeItem(LS_DAILY);
     words.forEach((w) => (w.familiarity = "unknown"));
+    ensureTodayBucket();
+    updateTodayChip();
     render();
   }
 }
@@ -42,14 +111,9 @@ async function loadCSV() {
   // Remove potential BOM
   csvText = csvText.replace(/^\uFEFF/, "");
 
-  const parsed = Papa.parse(csvText, {
-    header: true,
-    skipEmptyLines: true,
-  });
+  const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
 
-  const savedProgress = JSON.parse(
-    localStorage.getItem("vocabProgress") || "{}"
-  );
+  const savedProgress = JSON.parse(localStorage.getItem(LS_PROGRESS) || "{}");
 
   words = parsed.data.map((row) => {
     const original = row["Original"]?.trim() || "";
@@ -90,9 +154,9 @@ function render() {
   grid.innerHTML = "";
   pageItems.forEach((word) => grid.appendChild(createCard(word)));
 
-  pageInfo.textContent = `Page ${currentPage} / ${totalPages}`;
+  pageInfo.textContent = `Page ${currentPage} / ${Math.max(totalPages, 1)}`;
   prevBtn.disabled = currentPage === 1;
-  nextBtn.disabled = currentPage === totalPages;
+  nextBtn.disabled = currentPage === totalPages || totalPages === 0;
 }
 
 function createCard(word) {
@@ -113,6 +177,7 @@ function createCard(word) {
 
   const buttons = document.createElement("div");
   buttons.className = "familiarity-buttons";
+
   ["well_known", "known", "explored", "unknown"].forEach((level) => {
     const btn = document.createElement("button");
     btn.textContent = level.replace("_", " ");
@@ -125,27 +190,44 @@ function createCard(word) {
   return card;
 }
 
-function setFamiliarity(key, level) {
+function setFamiliarity(key, newLevel) {
   const word = words.find((w) => w.key === key);
   if (!word) return;
 
-  word.familiarity = level;
+  const oldLevel = word.familiarity || "unknown";
+  const oldRank = RANK[oldLevel] || 0;
+  const newRank = RANK[newLevel] || 0;
+
+  // ---- Highest-ever tracking ----
+  const highMap = JSON.parse(localStorage.getItem("vocabHighest") || "{}");
+  const prevHigh = RANK[highMap[key]] || 0;
+
+  // Only add to today's progress if you surpassed previous best
+  if (newRank > prevHigh) {
+    addDailyProgress(newRank - prevHigh);
+    highMap[key] = newLevel;
+    localStorage.setItem("vocabHighest", JSON.stringify(highMap));
+  }
+
+  // --------------------------------
+  word.familiarity = newLevel;
   saveProgress();
 
+  // Re-render respecting filters
   const jlptVal = jlptFilter.value;
   const famVal = familiarityFilter.value;
   const stillVisible =
     (jlptVal === "all" || word.jlpt === jlptVal) &&
     (famVal === "all" || word.familiarity === famVal);
 
-  if (!stillVisible) setTimeout(render, 150);
+  if (!stillVisible) setTimeout(render, 100);
   else render();
 }
 
 function saveProgress() {
   const progress = {};
   words.forEach((w) => (progress[w.key] = w.familiarity));
-  localStorage.setItem("vocabProgress", JSON.stringify(progress));
+  localStorage.setItem(LS_PROGRESS, JSON.stringify(progress));
 }
 
 function changePage(direction) {
@@ -154,17 +236,6 @@ function changePage(direction) {
 }
 
 /* ---- Stats Panel ---- */
-const statsPanel = document.getElementById("statsPanel");
-const statsContainer = document.getElementById("statsContainer");
-const toggleStats = document.getElementById("toggleStats");
-
-toggleStats.addEventListener("click", () => {
-  statsPanel.classList.toggle("hidden");
-  toggleStats.textContent = statsPanel.classList.contains("hidden")
-    ? "📊 Show Stats"
-    : "📉 Hide Stats";
-  if (!statsPanel.classList.contains("hidden")) updateStats();
-});
 function updateStats() {
   const cleanWords = words.filter((w) => {
     if (!w.jlpt) return false;
@@ -190,10 +261,8 @@ function updateStats() {
       explored: 0,
       unknown: 0,
     };
-
     acc[jlpt].total++;
     acc[jlpt][w.familiarity] = (acc[jlpt][w.familiarity] || 0) + 1;
-
     return acc;
   }, {});
 
@@ -211,11 +280,26 @@ function updateStats() {
   );
 
   const percentLearned = (
-    ((totals.well_known + totals.known + totals.explored) / totals.total) *
+    ((totals.well_known + totals.known + totals.explored) /
+      Math.max(totals.total, 1)) *
     100
   ).toFixed(1);
 
   const validLevels = ["N1", "N2", "N3", "N4", "N5"];
+
+  // Daily history (last 14 days)
+  const log = getDailyLog();
+  const days = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(d.getDate()).padStart(2, "0")}`;
+    days.push({ date: key, count: log[key] || 0 });
+  }
+  const totalWindow = days.reduce((s, x) => s + x.count, 0);
 
   // HTML build
   statsContainer.innerHTML = `
@@ -227,19 +311,19 @@ function updateStats() {
 
       <div class="progress-bar multi animate">
         <div class="segment well_known" style="width:${(
-          (totals.well_known / totals.total) *
+          (totals.well_known / Math.max(totals.total, 1)) *
           100
         ).toFixed(1)}%"></div>
         <div class="segment known" style="width:${(
-          (totals.known / totals.total) *
+          (totals.known / Math.max(totals.total, 1)) *
           100
         ).toFixed(1)}%"></div>
         <div class="segment explored" style="width:${(
-          (totals.explored / totals.total) *
+          (totals.explored / Math.max(totals.total, 1)) *
           100
         ).toFixed(1)}%"></div>
         <div class="segment unknown" style="width:${(
-          (totals.unknown / totals.total) *
+          (totals.unknown / Math.max(totals.total, 1)) *
           100
         ).toFixed(1)}%"></div>
       </div>
@@ -256,7 +340,7 @@ function updateStats() {
       .map((lvl) => {
         const g = familiarityGroups[lvl];
         const learnedPct = (
-          ((g.well_known + g.known + g.explored) / g.total) *
+          ((g.well_known + g.known + g.explored) / Math.max(g.total, 1)) *
           100
         ).toFixed(1);
 
@@ -269,19 +353,19 @@ function updateStats() {
 
           <div class="progress-bar multi animate">
             <div class="segment well_known" style="width:${(
-              (g.well_known / g.total) *
+              (g.well_known / Math.max(g.total, 1)) *
               100
             ).toFixed(1)}%"></div>
             <div class="segment known" style="width:${(
-              (g.known / g.total) *
+              (g.known / Math.max(g.total, 1)) *
               100
             ).toFixed(1)}%"></div>
             <div class="segment explored" style="width:${(
-              (g.explored / g.total) *
+              (g.explored / Math.max(g.total, 1)) *
               100
             ).toFixed(1)}%"></div>
             <div class="segment unknown" style="width:${(
-              (g.unknown / g.total) *
+              (g.unknown / Math.max(g.total, 1)) *
               100
             ).toFixed(1)}%"></div>
           </div>
@@ -294,6 +378,25 @@ function updateStats() {
         </div>`;
       })
       .join("")}
+
+    <div class="stats-card">
+      <h3>Daily Progress (last 14 days)</h3>
+      <p>Total this window: ${totalWindow}</p>
+      <div style="display:grid;grid-template-columns:repeat(14,1fr);gap:6px;margin-top:8px;">
+        ${days
+          .map(
+            (d) => `<div title="${d.date}: ${d.count}"
+                        style="height:40px;background:#e6eefc;border-radius:6px;position:relative;overflow:hidden;">
+                      <div style="position:absolute;bottom:0;left:0;right:0;height:${Math.min(
+                        100,
+                        d.count * 5
+                      )}%;background:#3b82f6;"></div>
+                    </div>`
+          )
+          .join("")}
+      </div>
+      <p class="legend" style="margin-top:6px;">Each bar = that day’s “improvement” points (Unknown→Known = 2, etc.).</p>
+    </div>
 
     <div class="motivation">${getMotivationMessage(percentLearned)}</div>
   `;
