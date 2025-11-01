@@ -17,6 +17,7 @@ const toggleStats = document.getElementById("toggleStats");
 
 const LS_PROGRESS = "vocabProgress"; // word familiarity map
 const LS_DAILY = "vocabProgressDaily"; // { "YYYY-MM-DD": number }
+const LS_HIGHEST = "vocabHighest"; // { key: "well_known" | "known" | ... }
 const RANK = { unknown: 0, explored: 1, known: 2, well_known: 3 };
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -45,12 +46,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   updateTodayChip();
 });
 
+/* =======================
+   Utilities: Dates / Logs
+======================= */
 function todayKey() {
   const d = new Date();
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const da = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${da}`; // local date
+  return `${y}-${m}-${da}`; // local date YYYY-MM-DD
 }
 
 function getDailyLog() {
@@ -89,21 +93,9 @@ function updateTodayChip() {
   todayChip.textContent = `Progress Points Today: ${log[t] || 0}`;
 }
 
-function resetProgress() {
-  if (
-    confirm(
-      "Are you sure you want to reset all progress? This cannot be undone."
-    )
-  ) {
-    localStorage.removeItem(LS_PROGRESS);
-    localStorage.removeItem(LS_DAILY);
-    words.forEach((w) => (w.familiarity = "unknown"));
-    ensureTodayBucket();
-    updateTodayChip();
-    render();
-  }
-}
-
+/* =======================
+   CSV / Render
+======================= */
 async function loadCSV() {
   const response = await fetch("jlpt_vocab.csv");
   let csvText = await response.text();
@@ -112,7 +104,6 @@ async function loadCSV() {
   csvText = csvText.replace(/^\uFEFF/, "");
 
   const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
-
   const savedProgress = JSON.parse(localStorage.getItem(LS_PROGRESS) || "{}");
 
   words = parsed.data.map((row) => {
@@ -190,26 +181,27 @@ function createCard(word) {
   return card;
 }
 
+/* =======================
+   Familiarity + Highest-Ever
+======================= */
 function setFamiliarity(key, newLevel) {
   const word = words.find((w) => w.key === key);
   if (!word) return;
 
   const oldLevel = word.familiarity || "unknown";
-  const oldRank = RANK[oldLevel] || 0;
   const newRank = RANK[newLevel] || 0;
 
-  // ---- Highest-ever tracking ----
-  const highMap = JSON.parse(localStorage.getItem("vocabHighest") || "{}");
+  // Highest-ever tracking
+  const highMap = JSON.parse(localStorage.getItem(LS_HIGHEST) || "{}");
   const prevHigh = RANK[highMap[key]] || 0;
 
   // Only add to today's progress if you surpassed previous best
   if (newRank > prevHigh) {
     addDailyProgress(newRank - prevHigh);
     highMap[key] = newLevel;
-    localStorage.setItem("vocabHighest", JSON.stringify(highMap));
+    localStorage.setItem(LS_HIGHEST, JSON.stringify(highMap));
   }
 
-  // --------------------------------
   word.familiarity = newLevel;
   saveProgress();
 
@@ -235,7 +227,179 @@ function changePage(direction) {
   render();
 }
 
-/* ---- Stats Panel ---- */
+/* =======================
+   Stats + Daily Chart
+======================= */
+function buildDailySeries(windowDays = 60) {
+  const log = getDailyLog();
+  const series = [];
+  for (let i = windowDays - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(d.getDate()).padStart(2, "0")}`;
+    series.push({ date: key, count: log[key] || 0 });
+  }
+  return series;
+}
+
+// YouTube-style daily bars: 1000 = full height, green if >= 1000.
+// Always show MM/DD above and count below each bar.
+let dailyOffset = parseInt(localStorage.getItem("dailyOffset") || "0", 10);
+
+function renderDailyGraph(series) {
+  const wrap = document.getElementById("dailyGraph");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+
+  const DAYS_VISIBLE = 10;
+  const totalDays = series.length;
+
+  // Clamp offset
+  if (dailyOffset < 0) dailyOffset = 0;
+
+  // If this is the first time opening (no saved offset),
+  // jump to the newest 10-day window by default
+  if (!localStorage.getItem("dailyOffset")) {
+    dailyOffset = Math.max(0, totalDays - DAYS_VISIBLE);
+    localStorage.setItem("dailyOffset", dailyOffset);
+  } else {
+    // Otherwise clamp safely if data changed
+    if (dailyOffset > Math.max(0, totalDays - DAYS_VISIBLE))
+      dailyOffset = Math.max(0, totalDays - DAYS_VISIBLE);
+  }
+
+  const visible = series.slice(dailyOffset, dailyOffset + DAYS_VISIBLE);
+
+  // Navigation controls
+  const nav = document.createElement("div");
+  nav.style.display = "flex";
+  nav.style.justifyContent = "space-between";
+  nav.style.alignItems = "center";
+  nav.style.marginBottom = "6px";
+
+  const left = document.createElement("button");
+  left.textContent = "←";
+  left.disabled = dailyOffset === 0;
+  left.style.cursor = left.disabled ? "default" : "pointer";
+  left.addEventListener("click", () => {
+    if (dailyOffset > 0) {
+      dailyOffset -= 1;
+      localStorage.setItem("dailyOffset", dailyOffset);
+      renderDailyGraph(series);
+    }
+  });
+
+  const right = document.createElement("button");
+  right.textContent = "→";
+  right.disabled = dailyOffset + DAYS_VISIBLE >= totalDays;
+  right.style.cursor = right.disabled ? "default" : "pointer";
+  right.addEventListener("click", () => {
+    if (dailyOffset + DAYS_VISIBLE < totalDays) {
+      dailyOffset += 1;
+      localStorage.setItem("dailyOffset", dailyOffset);
+      renderDailyGraph(series);
+    }
+  });
+
+  const label = document.createElement("span");
+  label.textContent = `Showing ${visible[0].date} → ${
+    visible[visible.length - 1].date
+  }`;
+  label.style.fontSize = "0.9em";
+  label.style.color = "#444";
+
+  nav.append(left, label, right);
+  wrap.appendChild(nav);
+
+  // SVG Chart
+  const MAX_POINTS = 1000;
+  const H = 220;
+  const PAD_L = 40,
+    PAD_R = 12,
+    PAD_T = 20,
+    PAD_B = 40;
+  const BAR_W = 20,
+    GAP = 14;
+  const W = PAD_L + PAD_R + visible.length * (BAR_W + GAP) - GAP;
+  const svgNS = "http://www.w3.org/2000/svg";
+
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+
+  const yScale = (v) =>
+    PAD_T + (H - PAD_T - PAD_B) * (1 - Math.min(v, MAX_POINTS) / MAX_POINTS);
+  const xAt = (i) => PAD_L + i * (BAR_W + GAP);
+
+  // Gridlines
+  const grid = document.createElementNS(svgNS, "g");
+  for (let i = 0; i <= 5; i++) {
+    const val = (MAX_POINTS / 5) * i;
+    const y = yScale(val);
+    const line = document.createElementNS(svgNS, "line");
+    line.setAttribute("x1", PAD_L);
+    line.setAttribute("y1", y);
+    line.setAttribute("x2", W - PAD_R);
+    line.setAttribute("y2", y);
+    line.setAttribute("stroke", "#ddd");
+    line.setAttribute("stroke-width", "1");
+    grid.appendChild(line);
+
+    const label = document.createElementNS(svgNS, "text");
+    label.setAttribute("x", PAD_L - 6);
+    label.setAttribute("y", y + 4);
+    label.setAttribute("text-anchor", "end");
+    label.setAttribute("class", "dg-tick");
+    label.textContent = Math.round(val);
+    grid.appendChild(label);
+  }
+  svg.appendChild(grid);
+
+  // Bars
+  const bars = document.createElementNS(svgNS, "g");
+  visible.forEach((s, i) => {
+    const x = xAt(i);
+    const y = yScale(s.count);
+    const h = yScale(0) - y;
+    const full = s.count >= MAX_POINTS;
+
+    const rect = document.createElementNS(svgNS, "rect");
+    rect.setAttribute("x", x);
+    rect.setAttribute("y", y);
+    rect.setAttribute("width", BAR_W);
+    rect.setAttribute("height", Math.max(2, h));
+    rect.setAttribute("rx", 3);
+    rect.setAttribute("ry", 3);
+    rect.style.fill = full ? "#22c55e" : "#3b82f6";
+    bars.appendChild(rect);
+
+    // date above
+    const dateTxt = document.createElementNS(svgNS, "text");
+    dateTxt.setAttribute("x", x + BAR_W / 2);
+    dateTxt.setAttribute("y", PAD_T + 10);
+    dateTxt.setAttribute("text-anchor", "middle");
+    dateTxt.setAttribute("class", "dg-label");
+    const [Y, M, D] = s.date.split("-");
+    dateTxt.textContent = `${M}/${D}`;
+    bars.appendChild(dateTxt);
+
+    // value below
+    const valTxt = document.createElementNS(svgNS, "text");
+    valTxt.setAttribute("x", x + BAR_W / 2);
+    valTxt.setAttribute("y", yScale(0) + 14);
+    valTxt.setAttribute("text-anchor", "middle");
+    valTxt.setAttribute("class", "dg-tick");
+    valTxt.textContent = s.count;
+    bars.appendChild(valTxt);
+  });
+
+  svg.appendChild(bars);
+  wrap.appendChild(svg);
+}
+
 function updateStats() {
   const cleanWords = words.filter((w) => {
     if (!w.jlpt) return false;
@@ -246,9 +410,7 @@ function updateStats() {
     return /^N[1-5]$/.test(jlpt);
   });
 
-  const total = cleanWords.length;
-
-  // Categorize by JLPT and familiarity type
+  // Categorize by JLPT + familiarity
   const familiarityGroups = cleanWords.reduce((acc, w) => {
     const jlpt = w.jlpt
       .toUpperCase()
@@ -266,7 +428,6 @@ function updateStats() {
     return acc;
   }, {});
 
-  // Overall totals
   const totals = Object.values(familiarityGroups).reduce(
     (acc, g) => {
       acc.total += g.total;
@@ -287,29 +448,20 @@ function updateStats() {
 
   const validLevels = ["N1", "N2", "N3", "N4", "N5"];
 
-  // Daily history (last 14 days)
-  const log = getDailyLog();
-  const days = [];
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
-      2,
-      "0"
-    )}-${String(d.getDate()).padStart(2, "0")}`;
-    days.push({ date: key, count: log[key] || 0 });
-  }
-  const totalWindow = days.reduce((s, x) => s + x.count, 0);
+  // Build daily series (adjust window as you like)
+  const series = buildDailySeries(60);
+  const windowTotal = Object.values(getDailyLog()).reduce(
+    (sum, v) => sum + v,
+    0
+  );
 
-  // HTML build
   statsContainer.innerHTML = `
     <div class="stats-card">
       <h2>Total Progress</h2>
       <p>${totals.well_known + totals.known + totals.explored} / ${
     totals.total
   } words studied</p>
-
-      <div class="progress-bar multi animate">
+      <div class="progress-bar multi">
         <div class="segment well_known" style="width:${(
           (totals.well_known / Math.max(totals.total, 1)) *
           100
@@ -327,7 +479,6 @@ function updateStats() {
           100
         ).toFixed(1)}%"></div>
       </div>
-
       <p class="legend">
         🌈 ${totals.well_known} well known • 🟩 ${totals.known} known • 🟦 ${
     totals.explored
@@ -343,15 +494,13 @@ function updateStats() {
           ((g.well_known + g.known + g.explored) / Math.max(g.total, 1)) *
           100
         ).toFixed(1);
-
         return `
         <div class="stats-card">
           <h3>${lvl}</h3>
           <p>${g.well_known + g.known + g.explored} / ${
           g.total
         } studied (${learnedPct}%)</p>
-
-          <div class="progress-bar multi animate">
+          <div class="progress-bar multi">
             <div class="segment well_known" style="width:${(
               (g.well_known / Math.max(g.total, 1)) *
               100
@@ -369,7 +518,6 @@ function updateStats() {
               100
             ).toFixed(1)}%"></div>
           </div>
-
           <p class="legend">
             🌈 ${g.well_known} well known • 🟩 ${g.known} known • 🟦 ${
           g.explored
@@ -380,35 +528,45 @@ function updateStats() {
       .join("")}
 
     <div class="stats-card">
-      <h3>Daily Progress (last 14 days)</h3>
-      <p>Total this window: ${totalWindow}</p>
-      <div style="display:grid;grid-template-columns:repeat(14,1fr);gap:6px;margin-top:8px;">
-        ${days
-          .map(
-            (d) => `<div title="${d.date}: ${d.count}"
-                        style="height:40px;background:#e6eefc;border-radius:6px;position:relative;overflow:hidden;">
-                      <div style="position:absolute;bottom:0;left:0;right:0;height:${Math.min(
-                        100,
-                        d.count * 5
-                      )}%;background:#3b82f6;"></div>
-                    </div>`
-          )
-          .join("")}
-      </div>
-      <p class="legend" style="margin-top:6px;">Each bar = that day’s “improvement” points (Unknown→Known = 2, etc.).</p>
+      <h3>Daily Progress (last ${series.length} days)</h3>
+      <p>Total progress points: ${windowTotal}</p>
+      <div id="dailyGraph" class="daily-graph"></div>
+      <p class="legend" style="margin-top:6px;">
+        Your recent progress points per day 
+      </p>
     </div>
 
     <div class="motivation">${getMotivationMessage(percentLearned)}</div>
   `;
+
+  renderDailyGraph(series);
 }
 
 function getMotivationMessage(percent) {
-  if (percent < 10)
+  const p = Number(percent);
+  if (p < 10)
     return "🌱 You’ve started your journey. Every word is a step forward!";
-  if (percent < 30)
-    return "🌿 Great progress! Keep watering your language garden.";
-  if (percent < 60)
-    return "🌸 You're blooming! You’re mastering this beautifully.";
-  if (percent < 90) return "🔥 You’re unstoppable. JLPT glory is near!";
+  if (p < 30) return "🌿 Great progress! Keep watering your language garden.";
+  if (p < 60) return "🌸 You're blooming! You’re mastering this beautifully.";
+  if (p < 90) return "🔥 You’re unstoppable. JLPT glory is near!";
   return "🌕 You’ve reached fluency enlightenment. Incredible work!";
+}
+
+/* =======================
+   Reset
+======================= */
+function resetProgress() {
+  if (
+    confirm(
+      "Are you sure you want to reset all progress? This cannot be undone."
+    )
+  ) {
+    localStorage.removeItem(LS_PROGRESS);
+    localStorage.removeItem(LS_DAILY);
+    localStorage.removeItem(LS_HIGHEST);
+    words.forEach((w) => (w.familiarity = "unknown"));
+    ensureTodayBucket();
+    updateTodayChip();
+    render();
+  }
 }

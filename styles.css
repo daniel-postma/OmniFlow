@@ -242,3 +242,74 @@ footer button {
   padding: 0.25rem 0.6rem;
   font-size: 0.85rem;
 }
+
+/* ----- Daily Graph ----- */
+.daily-graph {
+  position: relative;
+  padding: 0.75rem 0 0.5rem;
+}
+.daily-graph svg {
+  width: 100%;
+  height: 220px; /* feel free to adjust */
+  display: block;
+}
+.dg-axis {
+  stroke: #d8dee9;
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+.dg-grid {
+  stroke: #e9eef7;
+  stroke-width: 1;
+  opacity: 0.8;
+  shape-rendering: crispEdges;
+}
+.dg-bar {
+  fill: #3b82f6; /* default bar color */
+  rx: 3;
+  ry: 3;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.dg-bar:hover {
+  opacity: 0.8;
+}
+
+.dg-label {
+  font: 12px/1 "Segoe UI", sans-serif;
+  fill: #555;
+}
+.dg-tick {
+  font: 10px/1 "Segoe UI", sans-serif;
+  fill: #666;
+}
+
+/* Tooltip */
+.dg-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: #111827;
+  color: #fff;
+  border: 1px solid #334155;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  transform: translate(-50%, -120%);
+  opacity: 0;
+  transition: opacity 0.1s ease, transform 0.1s ease;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+.dg-tooltip.show {
+  opacity: 1;
+  transform: translate(-50%, -130%);
+}
+
+.dg-label {
+  font: 11px/1.1 "Segoe UI", sans-serif;
+  fill: #222;
+}
+.dg-tick {
+  font: 11px/1 "Segoe UI", sans-serif;
+  fill: #444;
+}
