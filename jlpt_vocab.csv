@@ -4490,7 +4490,6 @@ Original,Furigana,English,JLPT Level
 喧しい,やかましい,"noisy, loud, clamorous, boisterous",N2
 夜間,やかん,"at night, nighttime",N2
 やかん,やかん,kettle,N2
-やかん,やかん,kettle,N2
 役者,やくしゃ,actor,N2
 役所,やくしょ,"government office, public office",N2
 役人,やくにん,government official,N2
@@ -4628,7 +4627,6 @@ Original,Furigana,English,JLPT Level
 四角,しかく,square,N3
 直に,じかに,"immediately, readily, directly",N3
 しかも,しかも,"moreover, furthermore, besides, plus",N3
-四季,しき,four seasons,N3
 直,じき,"immediately, soon, shortly",N3
 時期,じき,"time, season, period",N3
 支給,しきゅう,"payment, allowance",N3
@@ -4669,7 +4667,6 @@ Original,Furigana,English,JLPT Level
 支店,してん,branch store (office),N3
 指導,しどう,"leadership, guidance, coaching",N3
 自動,じどう,"automatic, self-motion",N3
-児童,じどう,"children, juvenile",N3
 品,しな,"thing, article, goods",N3
 支配,しはい,"rule, control, direction",N3
 芝居,しばい,"play, drama",N3
@@ -4761,7 +4758,6 @@ Original,Furigana,English,JLPT Level
 消防,しょうぼう,"fire fighting, fire department",N3
 情報,じょうほう,"information, (military) intelligence",N3
 証明,しょうめい,"proof, verification",N3
-省略,しょうりゃく,"omission, abbreviation, abridgment",N3
 女王,じょおう,queen,N3
 職,しょく,employment,N3
 職業,しょくぎょう,"occupation, business",N3
@@ -4812,7 +4808,6 @@ Original,Furigana,English,JLPT Level
 心理,しんり,mentality,N3
 人類,じんるい,"mankind, humanity",N3
 巣,す,"nest, breeding place",N3
-酢,す,vinegar,N3
 図,ず,"figure, drawing, illustration",N3
 水準,すいじゅん,"level, standard",N3
 推薦,すいせん,recommendation,N3
@@ -4859,7 +4854,6 @@ Original,Furigana,English,JLPT Level
 正,せい,"(logical) true, regular",N3
 生,せい,birth,N3
 性,せい,"sex, gender",N3
-姓,せい,"surname, family name",N3
 所為,せい,"cause, reason, fault",N3
 税,ぜい,tax,N3
 性格,せいかく,"character, personality",N3
@@ -4871,7 +4865,6 @@ Original,Furigana,English,JLPT Level
 制限,せいげん,"restriction, restraint, limitation",N3
 成功,せいこう,"success, hit",N3
 正式,せいしき,"official, formal",N3
-性質,せいしつ,"nature, property, disposition",N3
 精神,せいしん,"mind, soul, spirit",N3
 成人,せいじん,adult,N3
 精々,せいぜい,"at the most, at best",N3
@@ -5053,7 +5046,6 @@ Original,Furigana,English,JLPT Level
 うっかり,うっかり,carelessly; inadvertently,N3
 映す,うつす,"to project, to reflect, to cast (shadow)",N3
 訴える,うったえる,"to complain, to appeal, to sue (a person)",N3
-写る,うつる,"to be photographed, to be projected",N3
 映る,うつる,"to be reflected, to come out (photo)",N3
 うなる,うなる,"to groan, to moan",N3
 奪う,うばう,"to rob, to deprive",N3
@@ -5061,7 +5053,6 @@ Original,Furigana,English,JLPT Level
 生まれ,うまれ,"birth, birth-place",N3
 有無,うむ,"yes or no, presence or absence",N3
 梅,うめ,"plum, lowest (of a three-tier ranking system)",N3
-埋める,うめる,"to bury, to fill up, to fill (a seat, a vacant position)",N3
 裏切る,うらぎる,"to betray, to turn traitor",N3
 羨ましい,うらやましい,"envious, enviable",N3
 売れる,うれる,to be sold,N3
@@ -5147,11 +5138,9 @@ Original,Furigana,English,JLPT Level
 温暖,おんだん,warmth,N3
 温度,おんど,temperature,N3
 可,か,passable,N3
-蚊,か,mosquito,N3
 課,か,"department, division",N3
 カー,カー,car,N3
 カード,カード,"card, curd",N3
-貝,かい,"shell, shellfish",N3
 害,がい,"harm, damage",N3
 会員,かいいん,"member, the membership",N3
 絵画,かいが,"picture, painting",N3
@@ -5227,14 +5216,12 @@ Original,Furigana,English,JLPT Level
 価値,かち,"value, worth, merit",N3
 がっかり,がっかり,"feel disappointed, be dejected, lose heart",N3
 活気,かっき,vigor; liveliness; vitality; energy,N3
-楽器,がっき,musical instrument,N3
 学期,がっき,term (school),N3
 活動,かつどう,"action, activity",N3
 活躍,かつやく,activity,N3
 活用,かつよう,conjugation; practical use,N3
 仮定,かてい,"assumption, supposition, hypothesis",N3
 過程,かてい,process,N3
-課程,かてい,"course, curriculum",N3
 悲しむ,かなしむ,"to be sad, to mourn for, to regret",N3
 必ずしも,かならずしも,"(not) always, (not) necessarily",N3
 かなり,かなり,"considerably, fairly, quite",N3
@@ -5251,7 +5238,6 @@ Original,Furigana,English,JLPT Level
 科目,かもく,"(school) subject, curriculum, course",N3
 かもしれない,かもしれない,"maybe, perhaps",N3
 かゆい,かゆい,"itchy, itching",N3
-歌謡,かよう,"song, ballad",N3
 空,から,empty,N3
 殻,から,"shell, husk, hull",N3
 柄,がら,pattern; build; character,N3
@@ -5344,7 +5330,6 @@ Original,Furigana,English,JLPT Level
 吸収,きゅうしゅう,"absorption, suction",N3
 救助,きゅうじょ,"relief, aid, rescue",N3
 急速,きゅうそく,"rapid (e.g., progress)",N3
-休息,きゅうそく,"rest, relief, relaxation",N3
 急に,きゅうに,suddenly,N3
 給料,きゅうりょう,"salary, wages",N3
 器用,きよう,"skillful, handy",N3
@@ -5497,7 +5482,6 @@ Original,Furigana,English,JLPT Level
 校舎,こうしゃ,school building,N3
 後者,こうしゃ,the latter,N3
 工場,こうば,"factory, plant",N3
-公正,こうせい,"justice, fairness, impartiality",N3
 構成,こうせい,"organization, composition",N3
 高速,こうそく,"high speed, high gear",N3
 行動,こうどう,"action, conduct, behavior",N3
@@ -5586,7 +5570,6 @@ Original,Furigana,English,JLPT Level
 叫ぶ,さけぶ,"to shout, to cry",N3
 避ける,さける,"to avoid (physical contact); to ward off, to avert",N3
 支える,ささえる,"support, hold, sustain",N3
-刺さる,ささる,"to stick, to be stuck",N3
 刺す,さす,"to sting, to bite (e.g., bug), to prick, to stab",N3
 指す,さす,"to point,",N3
 挿す,さす,"to insert, to put in, to graft",N3
@@ -5636,7 +5619,6 @@ Original,Furigana,English,JLPT Level
 剥く,むく,"to peel, to skin",N3
 向ける,むける,"to turn towards, to point",N3
 無視,むし,"disregard, ignore",N3
-蒸し暑い,むしあつい,"humid, sultry",N3
 虫歯,むしば,"cavity, tooth decay",N3
 寧ろ,むしろ,"rather, better, instead",N3
 蒸す,むす,"to steam, to poultice, to be sultry",N3
@@ -5648,7 +5630,6 @@ Original,Furigana,English,JLPT Level
 芽,め,sprout,N3
 明確,めいかく,"clear, definite",N3
 名刺,めいし,(name) card; business card,N3
-名詞,めいし,noun,N3
 命じる,めいじる,"to order, to command, to appoint",N3
 名人,めいじん,"master, expert",N3
 命令,めいれい,"order, command, decree",N3
@@ -5660,7 +5641,6 @@ Original,Furigana,English,JLPT Level
 面,めん,"face, mug, surface, side or facet, corner, page",N3
 綿,めん,cotton,N3
 免許,めんきょ,"license, permit, certificate",N3
-面接,めんせつ,interview,N3
 面倒,めんどう,"trouble, attention",N3
 メンバー,メンバー,member,N3
 申し込む,もうしこむ,"to apply for, to make an application",N3
@@ -5707,7 +5687,6 @@ Original,Furigana,English,JLPT Level
 やや,やや,"a little, partially, somewhat",N3
 唯一,ゆいいつ,"only, sole, unique",N3
 勇気,ゆうき,"courage, bravery, boldness",N3
-友好,ゆうこう,friendship,N3
 有効,ゆうこう,"valid, effectual",N3
 優秀,ゆうしゅう,"superiority, excellence",N3
 優勝,ゆうしょう,"overall victory, championship",N3
@@ -5772,12 +5751,10 @@ Original,Furigana,English,JLPT Level
 留学,りゅうがく,studying abroad,N3
 流行,りゅうこう,"fashionable, fad, prevailing",N3
 量,りょう,"quantity, amount",N3
-寮,りょう,"hostel, dormitory",N3
 両替,りょうがえ,"change, money exchange",N3
 料金,りょうきん,"fee, charge, fare",N3
 例,れい,"instance, example, case",N3
 礼,れい,expression of gratitude; bow,N3
-例外,れいがい,exception,N3
 礼儀,れいぎ,"manners, courtesy, etiquette",N3
 冷静,れいせい,"calm, coolness",N3
 列,れつ,"queue, line, row",N3
@@ -5970,7 +5947,6 @@ Original,Furigana,English,JLPT Level
 大した,たいした,"significant, great, considerable",N3
 体重,たいじゅう,(body) weight,N3
 対象,たいしょう,"target; object (of worship, study, etc.); subject (i.e., of taxation)",N3
-対照,たいしょう,"contrast, antithesis, comparison",N3
 大臣,だいじん,cabinet minister,N3
 対する,たいする,"to face, to confront, to oppose",N3
 大戦,たいせん,"great war, great battle",N3
@@ -6100,7 +6076,6 @@ Original,Furigana,English,JLPT Level
 通過,つうか,"passage through, passing",N3
 通貨,つうか,currency,N3
 通学,つうがく,commuting to school,N3
-通勤,つうきん,commuting to work,N3
 通行,つうこう,"passage, passing",N3
 通じる,つうじる,"to run to, to lead to, to communicate",N3
 通信,つうしん,"correspondence, communications",N3
@@ -6131,7 +6106,6 @@ Original,Furigana,English,JLPT Level
 翼,つばさ,wings,N3
 つまり,つまり,namely; in other words; in short,N3
 罪,つみ,"crime, fault, indiscretion",N3
-積む,つむ,"to pile up, to stack",N3
 詰める,つめる,"to pack, to shorten, to work out (details)",N3
 積もる,つもる,to pile up,N3
 梅雨,つゆ,rainy season,N3
@@ -6273,7 +6247,6 @@ Original,Furigana,English,JLPT Level
 悩む,なやむ,"to agonize, to be troubled",N3
 鳴らす,ならす,"to ring, to sound",N3
 為る,なる,"to change, to be of use, to reach to",N3
-生る,なる,to bear fruit,N3
 馴れる,なれる,"to become domesticated, to become tame",N3
 縄,なわ,rope,N3
 何で,なんで,"Why, What for",N3
@@ -6355,7 +6328,6 @@ Original,Furigana,English,JLPT Level
 計る,はかる,"to measure, to weigh, to survey",N3
 量る,はかる,"to measure, to weigh, to survey",N3
 測る,はかる,"to measure, to weigh, to survey",N3
-掃く,はく,"to sweep, to brush, to gather up",N3
 吐く,はく,"to throw up, to vomit",N3
 拍手,はくしゅ,"clapping hands, applause",N3
 莫大,ばくだい,"enormous, vast",N3
@@ -6535,7 +6507,6 @@ Original,Furigana,English,JLPT Level
 方向,ほうこう,"direction, course, way",N3
 報告,ほうこく,"report, information",N3
 宝石,ほうせき,"gem, jewel",N3
-包装,ほうそう,"packing, wrapping",N3
 豊富,ほうふ,"abundance, plenty",N3
 方法,ほうほう,"method, means, technique",N3
 方々,ほうぼう,"here and there, everywhere",N3
