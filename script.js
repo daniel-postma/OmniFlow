@@ -13,7 +13,6 @@ const prevBtn = document.getElementById("prevPage");
 const nextBtn = document.getElementById("nextPage");
 const todayChip = document.getElementById("todayChip");
 
-// Stats panel
 const statsPanel = document.getElementById("statsPanel");
 const statsContainer = document.getElementById("statsContainer");
 const toggleStats = document.getElementById("toggleStats");
@@ -48,11 +47,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!statsPanel.classList.contains("hidden")) updateStats();
   });
 
-  // Export/Import controls
+  // Export / Import
   const exportBtn = document.getElementById("exportData");
   const importBtn = document.getElementById("importData");
   const importFile = document.getElementById("importFile");
-
   exportBtn.addEventListener("click", exportData);
   importBtn.addEventListener("click", () => importFile.click());
   importFile.addEventListener("change", async (e) => {
@@ -86,7 +84,6 @@ function todayKey() {
     "0"
   )}-${String(d.getDate()).padStart(2, "0")}`;
 }
-
 function getDailyLog() {
   try {
     return JSON.parse(localStorage.getItem(LS_DAILY) || "{}");
@@ -97,7 +94,6 @@ function getDailyLog() {
 function setDailyLog(log) {
   localStorage.setItem(LS_DAILY, JSON.stringify(log));
 }
-
 function ensureTodayBucket() {
   const log = getDailyLog();
   const t = todayKey();
@@ -134,7 +130,6 @@ function getAllData() {
     },
   };
 }
-
 function downloadJSON(obj, name) {
   const blob = new Blob([JSON.stringify(obj, null, 2)], {
     type: "application/json",
@@ -143,14 +138,9 @@ function downloadJSON(obj, name) {
   const a = document.createElement("a");
   a.href = url;
   a.download = name;
-  document.body.appendChild(a);
   a.click();
-  setTimeout(() => {
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, 100);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
 }
-
 function exportData() {
   const d = new Date();
   const f = `fluencyflow_progress_${d.getFullYear()}${String(
@@ -158,16 +148,7 @@ function exportData() {
   ).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}.json`;
   downloadJSON(getAllData(), f);
 }
-
 function mergeMapsPreferHigherRank(base, incoming) {
-  const res = { ...base };
-  for (const [k, v] of Object.entries(incoming)) {
-    const cur = base[k];
-    res[k] = (RANK[v] || 0) > (RANK[cur] || 0) ? v : cur ?? v;
-  }
-  return res;
-}
-function mergeHighestMap(base, incoming) {
   const res = { ...base };
   for (const [k, v] of Object.entries(incoming)) {
     const cur = base[k];
@@ -182,7 +163,6 @@ function mergeDailyLog(base, incoming) {
   }
   return res;
 }
-
 function importDataFromObject(obj) {
   if (!obj || obj.schema !== "fluencyflow.v1") {
     alert("Invalid import file.");
@@ -208,14 +188,13 @@ function importDataFromObject(obj) {
     );
     localStorage.setItem(
       LS_HIGHEST,
-      JSON.stringify(mergeHighestMap(curHigh, vocabHighest || {}))
+      JSON.stringify(mergeMapsPreferHigherRank(curHigh, vocabHighest || {}))
     );
   } else {
     localStorage.setItem(LS_PROGRESS, JSON.stringify(vocabProgress || {}));
     localStorage.setItem(LS_DAILY, JSON.stringify(vocabProgressDaily || {}));
     localStorage.setItem(LS_HIGHEST, JSON.stringify(vocabHighest || {}));
   }
-
   if (typeof dailyOffset === "number")
     localStorage.setItem(LS_OFFSET, String(dailyOffset));
 
@@ -256,10 +235,8 @@ async function loadCSV() {
       familiarity: saved[key] || "unknown",
     };
   });
-
   console.log(`✅ Loaded ${words.length} words`);
 }
-
 function render() {
   const jlptVal = jlptFilter.value;
   const famVal = familiarityFilter.value;
@@ -281,7 +258,6 @@ function render() {
   prevBtn.disabled = currentPage === 1;
   nextBtn.disabled = currentPage === totalPages || totalPages === 0;
 }
-
 function createCard(word) {
   const card = document.createElement("div");
   card.className = "word-card";
@@ -290,7 +266,6 @@ function createCard(word) {
     <div class="furigana">${word.furigana}</div>
     <div class="meaning">${word.english}</div>
   `;
-
   const buttons = document.createElement("div");
   buttons.className = "familiarity-buttons";
   ["well_known", "known", "explored", "unknown"].forEach((level) => {
@@ -300,7 +275,6 @@ function createCard(word) {
     btn.addEventListener("click", () => setFamiliarity(word.key, level));
     buttons.appendChild(btn);
   });
-
   card.appendChild(buttons);
   return card;
 }
@@ -324,24 +298,145 @@ function setFamiliarity(key, newLevel) {
   render();
   updateStats();
 }
-
 function saveProgress() {
   const data = {};
   words.forEach((w) => (data[w.key] = w.familiarity));
   localStorage.setItem(LS_PROGRESS, JSON.stringify(data));
 }
-
 function changePage(dir) {
   currentPage += dir;
   render();
 }
 
 /* =======================
-   Stats + Reset
+   Stats + Graph + Reset
 ======================= */
+function buildDailySeries(windowDays = 60) {
+  const log = getDailyLog();
+  const series = [];
+  for (let i = windowDays - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(d.getDate()).padStart(2, "0")}`;
+    series.push({ date: key, count: log[key] || 0 });
+  }
+  return series;
+}
+
+let dailyOffset = parseInt(localStorage.getItem(LS_OFFSET) || "0", 10);
+function renderDailyGraph(series) {
+  const wrap = document.getElementById("dailyGraph");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+
+  const DAYS_VISIBLE = 10;
+  const totalDays = series.length;
+  dailyOffset = Math.min(
+    Math.max(dailyOffset, 0),
+    Math.max(0, totalDays - DAYS_VISIBLE)
+  );
+  const visible = series.slice(dailyOffset, dailyOffset + DAYS_VISIBLE);
+
+  const nav = document.createElement("div");
+  nav.className = "daily-nav";
+  const left = document.createElement("button");
+  left.textContent = "←";
+  left.disabled = dailyOffset === 0;
+  left.addEventListener("click", () => {
+    dailyOffset = Math.max(0, dailyOffset - 1);
+    localStorage.setItem(LS_OFFSET, dailyOffset);
+    renderDailyGraph(series);
+  });
+  const right = document.createElement("button");
+  right.textContent = "→";
+  right.disabled = dailyOffset + DAYS_VISIBLE >= totalDays;
+  right.addEventListener("click", () => {
+    dailyOffset = Math.min(totalDays - DAYS_VISIBLE, dailyOffset + 1);
+    localStorage.setItem(LS_OFFSET, dailyOffset);
+    renderDailyGraph(series);
+  });
+  const label = document.createElement("span");
+  label.textContent = `${visible[0].date} → ${
+    visible[visible.length - 1].date
+  }`;
+  nav.append(left, label, right);
+  wrap.appendChild(nav);
+
+  const svgNS = "http://www.w3.org/2000/svg";
+  const H = 220;
+  const PAD_T = 24,
+    PAD_B = 40;
+  const BAR_W = 22,
+    GAP = 16;
+  const MAX_POINTS = 1000;
+  const W = visible.length * (BAR_W + GAP) + 20;
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.classList.add("daily-svg");
+
+  const tooltip = document.createElement("div");
+  tooltip.className = "dg-tooltip";
+  wrap.appendChild(tooltip);
+
+  const yScale = (v) =>
+    PAD_T + (H - PAD_T - PAD_B) * (1 - Math.min(v, MAX_POINTS) / MAX_POINTS);
+
+  visible.forEach((d, i) => {
+    const x = i * (BAR_W + GAP) + 20;
+    const y = yScale(d.count);
+    const h = yScale(0) - y;
+    const full = d.count >= MAX_POINTS;
+
+    const rect = document.createElementNS(svgNS, "rect");
+    rect.setAttribute("x", x);
+    rect.setAttribute("y", y);
+    rect.setAttribute("width", BAR_W);
+    rect.setAttribute("height", h);
+    rect.setAttribute("rx", 3);
+    rect.classList.add("dg-bar");
+    rect.style.fill = full ? "#22c55e" : "#3b82f6";
+
+    rect.addEventListener("mouseenter", (e) => {
+      tooltip.textContent = `${d.date}: ${d.count} pts`;
+      tooltip.style.left = e.pageX + "px";
+      tooltip.style.top = e.pageY - 30 + "px";
+      tooltip.classList.add("show");
+    });
+    rect.addEventListener("mouseleave", () => tooltip.classList.remove("show"));
+
+    svg.appendChild(rect);
+
+    const dateTxt = document.createElementNS(svgNS, "text");
+    dateTxt.setAttribute("x", x + BAR_W / 2);
+    dateTxt.setAttribute("y", PAD_T);
+    dateTxt.setAttribute("text-anchor", "middle");
+    dateTxt.textContent = d.date.slice(5);
+    svg.appendChild(dateTxt);
+
+    const valTxt = document.createElementNS(svgNS, "text");
+    valTxt.setAttribute("x", x + BAR_W / 2);
+    valTxt.setAttribute("y", H - 10);
+    valTxt.setAttribute("text-anchor", "middle");
+    valTxt.textContent = d.count;
+    svg.appendChild(valTxt);
+  });
+  wrap.appendChild(svg);
+}
+
+function getMotivationMessage(p) {
+  const val = parseFloat(p);
+  if (val >= 90) return "🌸 You're a language master in bloom!";
+  if (val >= 70) return "🌱 Beautiful growth — keep exploring!";
+  if (val >= 40) return "✨ Solid progress — stay curious!";
+  return "🔥 Every click plants a new seed of fluency!";
+}
+
 function updateStats() {
-  const clean = words.filter((w) => w.jlpt && /^N[1-5]$/.test(w.jlpt));
-  const group = clean.reduce((acc, w) => {
+  const cleanWords = words.filter((w) => w.jlpt && /^N[1-5]$/.test(w.jlpt));
+  const groups = cleanWords.reduce((acc, w) => {
     const jlpt = w.jlpt;
     acc[jlpt] = acc[jlpt] || {
       total: 0,
@@ -354,7 +449,8 @@ function updateStats() {
     acc[jlpt][w.familiarity]++;
     return acc;
   }, {});
-  const totals = Object.values(group).reduce(
+
+  const totals = Object.values(groups).reduce(
     (a, g) => {
       a.total += g.total;
       a.well_known += g.well_known;
@@ -365,23 +461,78 @@ function updateStats() {
     },
     { total: 0, well_known: 0, known: 0, explored: 0, unknown: 0 }
   );
+
   const percent = (
     ((totals.well_known + totals.known + totals.explored) /
       Math.max(totals.total, 1)) *
     100
   ).toFixed(1);
-
-  const totalPoints = Object.values(getDailyLog()).reduce((s, v) => s + v, 0);
+  const series = buildDailySeries(60);
+  const grandTotal = Object.values(getDailyLog()).reduce((s, v) => s + v, 0);
 
   statsContainer.innerHTML = `
     <div class="stats-card">
       <h2>Total Progress</h2>
       <p>${totals.well_known + totals.known + totals.explored} / ${
     totals.total
-  } words</p>
-      <p><strong>${totalPoints}</strong> total progress points</p>
+  } words studied</p>
+      <div class="progress-bar multi">
+        <div class="segment well_known" style="width:${
+          (totals.well_known / totals.total) * 100
+        }%"></div>
+        <div class="segment known" style="width:${
+          (totals.known / totals.total) * 100
+        }%"></div>
+        <div class="segment explored" style="width:${
+          (totals.explored / totals.total) * 100
+        }%"></div>
+        <div class="segment unknown" style="width:${
+          (totals.unknown / totals.total) * 100
+        }%"></div>
+      </div>
+      <p class="legend">🌈 ${totals.well_known} well known • 🟩 ${
+    totals.known
+  } known • 🟦 ${totals.explored} explored • ⚪ ${totals.unknown} unknown</p>
+      <p><strong>${grandTotal}</strong> total progress points</p>
     </div>
+    ${["N1", "N2", "N3", "N4", "N5"]
+      .filter((l) => groups[l])
+      .map((l) => {
+        const g = groups[l];
+        const pct = (
+          ((g.well_known + g.known + g.explored) / g.total) *
+          100
+        ).toFixed(1);
+        return `
+        <div class="stats-card">
+          <h3>${l}</h3>
+          <p>${g.well_known + g.known + g.explored} / ${
+          g.total
+        } studied (${pct}%)</p>
+          <div class="progress-bar multi">
+            <div class="segment well_known" style="width:${
+              (g.well_known / g.total) * 100
+            }%"></div>
+            <div class="segment known" style="width:${
+              (g.known / g.total) * 100
+            }%"></div>
+            <div class="segment explored" style="width:${
+              (g.explored / g.total) * 100
+            }%"></div>
+            <div class="segment unknown" style="width:${
+              (g.unknown / g.total) * 100
+            }%"></div>
+          </div>
+        </div>`;
+      })
+      .join("")}
+    <div class="stats-card">
+      <h3>Daily Progress (last 60 days)</h3>
+      <div id="dailyGraph" class="daily-graph"></div>
+    </div>
+    <div class="motivation">${getMotivationMessage(percent)}</div>
   `;
+  renderDailyGraph(series);
 }
 
 function resetProgress() {
