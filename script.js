@@ -467,10 +467,12 @@ function updateStats() {
       Math.max(totals.total, 1)) *
     100
   ).toFixed(1);
+
   const series = buildDailySeries(60);
   const grandTotal = Object.values(getDailyLog()).reduce((s, v) => s + v, 0);
 
-  statsContainer.innerHTML = `
+  // Total card
+  let html = `
     <div class="stats-card">
       <h2>Total Progress</h2>
       <p>${totals.well_known + totals.known + totals.explored} / ${
@@ -478,60 +480,75 @@ function updateStats() {
   } words studied</p>
       <div class="progress-bar multi">
         <div class="segment well_known" style="width:${
-          (totals.well_known / totals.total) * 100
+          (totals.well_known / Math.max(totals.total, 1)) * 100
         }%"></div>
         <div class="segment known" style="width:${
-          (totals.known / totals.total) * 100
+          (totals.known / Math.max(totals.total, 1)) * 100
         }%"></div>
         <div class="segment explored" style="width:${
-          (totals.explored / totals.total) * 100
+          (totals.explored / Math.max(totals.total, 1)) * 100
         }%"></div>
         <div class="segment unknown" style="width:${
-          (totals.unknown / totals.total) * 100
+          (totals.unknown / Math.max(totals.total, 1)) * 100
         }%"></div>
       </div>
-      <p class="legend">🌈 ${totals.well_known} well known • 🟩 ${
-    totals.known
-  } known • 🟦 ${totals.explored} explored • ⚪ ${totals.unknown} unknown</p>
+      <p class="legend">
+        🌈 ${totals.well_known} well known • 🟩 ${totals.known} known • 🟦 ${
+    totals.explored
+  } explored • ⚪ ${totals.unknown} unknown
+      </p>
       <p><strong>${grandTotal}</strong> total progress points</p>
     </div>
-    ${["N1", "N2", "N3", "N4", "N5"]
-      .filter((l) => groups[l])
-      .map((l) => {
-        const g = groups[l];
-        const pct = (
-          ((g.well_known + g.known + g.explored) / g.total) *
-          100
-        ).toFixed(1);
-        return `
-        <div class="stats-card">
-          <h3>${l}</h3>
-          <p>${g.well_known + g.known + g.explored} / ${
-          g.total
-        } studied (${pct}%)</p>
-          <div class="progress-bar multi">
-            <div class="segment well_known" style="width:${
-              (g.well_known / g.total) * 100
-            }%"></div>
-            <div class="segment known" style="width:${
-              (g.known / g.total) * 100
-            }%"></div>
-            <div class="segment explored" style="width:${
-              (g.explored / g.total) * 100
-            }%"></div>
-            <div class="segment unknown" style="width:${
-              (g.unknown / g.total) * 100
-            }%"></div>
-          </div>
-        </div>`;
-      })
-      .join("")}
+  `;
+
+  // Per-level cards with legend
+  ["N1", "N2", "N3", "N4", "N5"].forEach((lvl) => {
+    const g = groups[lvl];
+    if (!g) return;
+    const pct = (
+      ((g.well_known + g.known + g.explored) / Math.max(g.total, 1)) *
+      100
+    ).toFixed(1);
+
+    html += `
+      <div class="stats-card">
+        <h3>${lvl}</h3>
+        <p>${g.well_known + g.known + g.explored} / ${
+      g.total
+    } studied (${pct}%)</p>
+        <div class="progress-bar multi">
+          <div class="segment well_known" style="width:${
+            (g.well_known / Math.max(g.total, 1)) * 100
+          }%"></div>
+          <div class="segment known" style="width:${
+            (g.known / Math.max(g.total, 1)) * 100
+          }%"></div>
+          <div class="segment explored" style="width:${
+            (g.explored / Math.max(g.total, 1)) * 100
+          }%"></div>
+          <div class="segment unknown" style="width:${
+            (g.unknown / Math.max(g.total, 1)) * 100
+          }%"></div>
+        </div>
+        <p class="legend">
+          🌈 ${g.well_known} well known • 🟩 ${g.known} known • 🟦 ${
+      g.explored
+    } explored • ⚪ ${g.unknown} unknown
+        </p>
+      </div>
+    `;
+  });
+
+  // Daily graph + motivation
+  html += `
     <div class="stats-card">
       <h3>Daily Progress (last 60 days)</h3>
       <div id="dailyGraph" class="daily-graph"></div>
     </div>
     <div class="motivation">${getMotivationMessage(percent)}</div>
   `;
+
+  statsContainer.innerHTML = html;
   renderDailyGraph(series);
 }
 
