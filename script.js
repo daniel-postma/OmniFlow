@@ -21,6 +21,8 @@ const LS_PROGRESS = "vocabProgress";
 const LS_DAILY = "vocabProgressDaily";
 const LS_HIGHEST = "vocabHighest";
 const LS_OFFSET = "dailyOffset";
+const showRomajiChk = document.getElementById("showRomaji");
+
 const RANK = { unknown: 0, explored: 1, known: 2, well_known: 3 };
 
 /* =======================
@@ -34,6 +36,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   familiarityFilter.addEventListener("change", render);
   prevBtn.addEventListener("click", () => changePage(-1));
   nextBtn.addEventListener("click", () => changePage(1));
+  showRomajiChk.addEventListener("change", render);
 
   document
     .getElementById("resetProgress")
@@ -213,6 +216,186 @@ function importDataFromObject(obj) {
 /* =======================
    CSV + Rendering
 ======================= */
+// --- Kana -> Romaji (Hepburn-ish) ---
+function kanaToRomaji(input) {
+  if (!input) return "";
+
+  // Normalize to hiragana for simpler mapping (katakana -> hiragana)
+  const toHiragana = (str) =>
+    str.replace(/[\u30a1-\u30f6]/g, (c) =>
+      String.fromCharCode(c.charCodeAt(0) - 0x60)
+    );
+
+  let s = toHiragana(input);
+
+  // Youon digraphs (small ya/yu/yo)
+  const digraphs = {
+    きゃ: "kya",
+    きゅ: "kyu",
+    きょ: "kyo",
+    ぎゃ: "gya",
+    ぎゅ: "gyu",
+    ぎょ: "gyo",
+    しゃ: "sha",
+    しゅ: "shu",
+    しょ: "sho",
+    じゃ: "ja",
+    じゅ: "ju",
+    じょ: "jo",
+    ちゃ: "cha",
+    ちゅ: "chu",
+    ちょ: "cho",
+    にゃ: "nya",
+    にゅ: "nyu",
+    にょ: "nyo",
+    ひゃ: "hya",
+    ひゅ: "hyu",
+    ひょ: "hyo",
+    びゃ: "bya",
+    びゅ: "byu",
+    びょ: "byo",
+    ぴゃ: "pya",
+    ぴゅ: "pyu",
+    ぴょ: "pyo",
+    みゃ: "mya",
+    みゅ: "myu",
+    みょ: "myo",
+    りゃ: "rya",
+    りゅ: "ryu",
+    りょ: "ryo",
+  };
+
+  const base = {
+    あ: "a",
+    い: "i",
+    う: "u",
+    え: "e",
+    お: "o",
+    か: "ka",
+    き: "ki",
+    く: "ku",
+    け: "ke",
+    こ: "ko",
+    さ: "sa",
+    し: "shi",
+    す: "su",
+    せ: "se",
+    そ: "so",
+    た: "ta",
+    ち: "chi",
+    つ: "tsu",
+    て: "te",
+    と: "to",
+    な: "na",
+    に: "ni",
+    ぬ: "nu",
+    ね: "ne",
+    の: "no",
+    は: "ha",
+    ひ: "hi",
+    ふ: "fu",
+    へ: "he",
+    ほ: "ho",
+    ま: "ma",
+    み: "mi",
+    む: "mu",
+    め: "me",
+    も: "mo",
+    や: "ya",
+    ゆ: "yu",
+    よ: "yo",
+    ら: "ra",
+    り: "ri",
+    る: "ru",
+    れ: "re",
+    ろ: "ro",
+    わ: "wa",
+    を: "o",
+    ん: "n",
+    が: "ga",
+    ぎ: "gi",
+    ぐ: "gu",
+    げ: "ge",
+    ご: "go",
+    ざ: "za",
+    じ: "ji",
+    ず: "zu",
+    ぜ: "ze",
+    ぞ: "zo",
+    だ: "da",
+    ぢ: "ji",
+    づ: "zu",
+    で: "de",
+    ど: "do",
+    ば: "ba",
+    び: "bi",
+    ぶ: "bu",
+    べ: "be",
+    ぼ: "bo",
+    ぱ: "pa",
+    ぴ: "pi",
+    ぷ: "pu",
+    ぺ: "pe",
+    ぽ: "po",
+    ゃ: "ya",
+    ゅ: "yu",
+    ょ: "yo",
+    ぁ: "a",
+    ぃ: "i",
+    ぅ: "u",
+    ぇ: "e",
+    ぉ: "o",
+    ー: "-", // long mark (handled later)
+  };
+
+  // Build romaji greedily (digraphs first)
+  let out = "";
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    const pair = s.slice(i, i + 2);
+
+    // sokuon (small tsu) doubles next consonant (except vowels/n)
+    if (c === "っ") {
+      const nextPair = s.slice(i + 1, i + 3);
+      const nextChar = s[i + 1];
+      let rom = "";
+      if (digraphs[nextPair]) rom = digraphs[nextPair];
+      else if (base[nextChar]) rom = base[nextChar];
+      const first = rom ? rom[0] : "";
+      if (first && /[bcdfghjklmnpqrstvwxyz]/.test(first)) out += first;
+      continue; // don't advance i yet; next loop will consume
+    }
+
+    // digraph
+    if (digraphs[pair]) {
+      out += digraphs[pair];
+      i++;
+      continue;
+    }
+
+    // long mark: repeat last vowel
+    if (c === "ー") {
+      const m = out.match(/[aiueo]$/);
+      if (m) out += m[0];
+      continue;
+    }
+
+    // base mapping
+    if (base[c]) {
+      out += base[c];
+      continue;
+    }
+
+    // punctuation/others
+    out += c;
+  }
+
+  // ん before b/m/p → m (Hepburn)
+  out = out.replace(/n(?=[bmp])/g, "m");
+
+  return out;
+}
+
 async function loadCSV() {
   const res = await fetch("jlpt_vocab.csv");
   let text = await res.text();
@@ -226,12 +409,17 @@ async function loadCSV() {
     const english = r["English"]?.trim() || "";
     const jlpt = r["JLPT Level"]?.trim().toUpperCase() || "";
     const key = `${original}|${furigana}|${english}`;
+
+    const readingSource = furigana || original;
+    const romaji = kanaToRomaji(readingSource);
+
     return {
       original,
       furigana,
       english,
       jlpt,
       key,
+      romaji,
       familiarity: saved[key] || "unknown",
     };
   });
@@ -261,11 +449,24 @@ function render() {
 function createCard(word) {
   const card = document.createElement("div");
   card.className = "word-card";
-  card.innerHTML = `
-    <div class="word-header"><span>${word.original}</span><span class="jlpt">${word.jlpt}</span></div>
-    <div class="furigana">${word.furigana}</div>
-    <div class="meaning">${word.english}</div>
-  `;
+
+  const header = document.createElement("div");
+  header.className = "word-header";
+  header.innerHTML = `<span>${word.original}</span><span class="jlpt">${word.jlpt}</span>`;
+
+  const furigana = document.createElement("div");
+  furigana.className = "furigana";
+  furigana.textContent = word.furigana;
+
+  const romaji = document.createElement("div");
+  romaji.className = "romaji";
+  romaji.style.display = showRomajiChk.checked ? "block" : "none";
+  romaji.textContent = word.romaji;
+
+  const meaning = document.createElement("div");
+  meaning.className = "meaning";
+  meaning.textContent = word.english;
+
   const buttons = document.createElement("div");
   buttons.className = "familiarity-buttons";
   ["well_known", "known", "explored", "unknown"].forEach((level) => {
@@ -275,7 +476,8 @@ function createCard(word) {
     btn.addEventListener("click", () => setFamiliarity(word.key, level));
     buttons.appendChild(btn);
   });
-  card.appendChild(buttons);
+
+  card.append(header, furigana, romaji, meaning, buttons);
   return card;
 }
 

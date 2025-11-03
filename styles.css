@@ -313,3 +313,11 @@ footer button {
   font: 11px/1 "Segoe UI", sans-serif;
   fill: #444;
 }
+
+.romaji {
+  font-size: 1.08em;
+  letter-spacing: 0.02em;
+  font-weight: 500;
+  color: #222;
+  margin-bottom: 0.25rem;
+}
