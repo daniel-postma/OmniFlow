@@ -30,24 +30,29 @@
           <option value="unknown">Unknown</option>
         </select>
 
+        <label style="display: flex; gap: 0.35rem">
+          <input type="checkbox" id="showRomaji" />
+          Show Romaji
+        </label>
         <button id="resetProgress">🔄 Reset Progress</button>
+        <button id="exportData">⬇️ Export Data</button>
+        <button id="importData">⬆️ Import Data</button>
+        <input
+          id="importFile"
+          type="file"
+          accept=".json"
+          style="display: none"
+        />
         <button id="toggleStats">📊 Show Stats</button>
 
         <span id="todayChip" class="chip">Progress Points Today: 0</span>
 
-        <button id="exportData">⬇️ Export Data</button>
-        <button id="importData">⬆️ Import Data</button>
         <input
           id="importFile"
           type="file"
           accept="application/json"
           style="display: none"
         />
-
-        <label style="display: flex; align-items: center; gap: 0.35rem">
-          <input type="checkbox" id="showRomaji" />
-          Show Romaji
-        </label>
       </div>
     </header>
 
