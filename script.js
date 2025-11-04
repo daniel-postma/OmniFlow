@@ -428,11 +428,19 @@ async function loadCSV() {
 function render() {
   const jlptVal = jlptFilter.value;
   const famVal = familiarityFilter.value;
+
   let filtered = words.filter(
     (w) =>
       (jlptVal === "all" || w.jlpt === jlptVal) &&
       (famVal === "all" || w.familiarity === famVal)
   );
+
+  // ✅ Sort from N5 → N1 when showing all
+  if (jlptVal === "all") {
+    const jlptOrder = { N5: 1, N4: 2, N3: 3, N2: 4, N1: 5 };
+    filtered.sort((a, b) => jlptOrder[a.jlpt] - jlptOrder[b.jlpt]);
+  }
+
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
   if (currentPage > totalPages) currentPage = totalPages || 1;
 
@@ -446,6 +454,7 @@ function render() {
   prevBtn.disabled = currentPage === 1;
   nextBtn.disabled = currentPage === totalPages || totalPages === 0;
 }
+
 function createCard(word) {
   const card = document.createElement("div");
   card.className = "word-card";
