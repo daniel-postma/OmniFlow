@@ -17,11 +17,14 @@ const statsPanel = document.getElementById("statsPanel");
 const statsContainer = document.getElementById("statsContainer");
 const toggleStats = document.getElementById("toggleStats");
 
+const showRomajiChk = document.getElementById("showRomaji");
+const favoritesOnlyChk = document.getElementById("favoritesOnly");
+
 const LS_PROGRESS = "vocabProgress";
 const LS_DAILY = "vocabProgressDaily";
 const LS_HIGHEST = "vocabHighest";
 const LS_OFFSET = "dailyOffset";
-const showRomajiChk = document.getElementById("showRomaji");
+const LS_FAVORITES = "vocabFavorites";
 
 const RANK = { unknown: 0, explored: 1, known: 2, well_known: 3 };
 
@@ -34,6 +37,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   jlptFilter.addEventListener("change", render);
   familiarityFilter.addEventListener("change", render);
+  favoritesOnlyChk.addEventListener("change", render);
   prevBtn.addEventListener("click", () => changePage(-1));
   nextBtn.addEventListener("click", () => changePage(1));
   showRomajiChk.addEventListener("change", render);
@@ -87,6 +91,7 @@ function todayKey() {
     "0"
   )}-${String(d.getDate()).padStart(2, "0")}`;
 }
+
 function getDailyLog() {
   try {
     return JSON.parse(localStorage.getItem(LS_DAILY) || "{}");
@@ -94,9 +99,11 @@ function getDailyLog() {
     return {};
   }
 }
+
 function setDailyLog(log) {
   localStorage.setItem(LS_DAILY, JSON.stringify(log));
 }
+
 function ensureTodayBucket() {
   const log = getDailyLog();
   const t = todayKey();
@@ -105,6 +112,7 @@ function ensureTodayBucket() {
     setDailyLog(log);
   }
 }
+
 function addDailyProgress(delta) {
   if (delta <= 0) return;
   const log = getDailyLog();
@@ -113,6 +121,7 @@ function addDailyProgress(delta) {
   setDailyLog(log);
   updateTodayChip();
 }
+
 function updateTodayChip() {
   const log = getDailyLog();
   todayChip.textContent = `Progress Points Today: ${log[todayKey()] || 0}`;
@@ -129,10 +138,12 @@ function getAllData() {
       vocabProgress: JSON.parse(localStorage.getItem(LS_PROGRESS) || "{}"),
       vocabProgressDaily: JSON.parse(localStorage.getItem(LS_DAILY) || "{}"),
       vocabHighest: JSON.parse(localStorage.getItem(LS_HIGHEST) || "{}"),
+      vocabFavorites: JSON.parse(localStorage.getItem(LS_FAVORITES) || "{}"),
       dailyOffset: parseInt(localStorage.getItem(LS_OFFSET) || "0", 10),
     },
   };
 }
+
 function downloadJSON(obj, name) {
   const blob = new Blob([JSON.stringify(obj, null, 2)], {
     type: "application/json",
@@ -144,6 +155,7 @@ function downloadJSON(obj, name) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 100);
 }
+
 function exportData() {
   const d = new Date();
   const f = `fluencyflow_progress_${d.getFullYear()}${String(
@@ -151,6 +163,7 @@ function exportData() {
   ).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}.json`;
   downloadJSON(getAllData(), f);
 }
+
 function mergeMapsPreferHigherRank(base, incoming) {
   const res = { ...base };
   for (const [k, v] of Object.entries(incoming)) {
@@ -159,6 +172,7 @@ function mergeMapsPreferHigherRank(base, incoming) {
   }
   return res;
 }
+
 function mergeDailyLog(base, incoming) {
   const res = { ...base };
   for (const [date, val] of Object.entries(incoming)) {
@@ -166,13 +180,20 @@ function mergeDailyLog(base, incoming) {
   }
   return res;
 }
+
 function importDataFromObject(obj) {
   if (!obj || obj.schema !== "fluencyflow.v1") {
     alert("Invalid import file.");
     return;
   }
-  const { vocabProgress, vocabProgressDaily, vocabHighest, dailyOffset } =
-    obj.data;
+  const {
+    vocabProgress,
+    vocabProgressDaily,
+    vocabHighest,
+    vocabFavorites,
+    dailyOffset,
+  } = obj.data;
+
   const merge = confirm(
     "Import data: OK to MERGE (keep progress) or Cancel to REPLACE?"
   );
@@ -181,6 +202,8 @@ function importDataFromObject(obj) {
     const curProg = JSON.parse(localStorage.getItem(LS_PROGRESS) || "{}");
     const curDaily = JSON.parse(localStorage.getItem(LS_DAILY) || "{}");
     const curHigh = JSON.parse(localStorage.getItem(LS_HIGHEST) || "{}");
+    const curFavs = JSON.parse(localStorage.getItem(LS_FAVORITES) || "{}");
+
     localStorage.setItem(
       LS_PROGRESS,
       JSON.stringify(mergeMapsPreferHigherRank(curProg, vocabProgress || {}))
@@ -193,17 +216,27 @@ function importDataFromObject(obj) {
       LS_HIGHEST,
       JSON.stringify(mergeMapsPreferHigherRank(curHigh, vocabHighest || {}))
     );
+    localStorage.setItem(
+      LS_FAVORITES,
+      JSON.stringify({ ...curFavs, ...(vocabFavorites || {}) })
+    );
   } else {
     localStorage.setItem(LS_PROGRESS, JSON.stringify(vocabProgress || {}));
-    localStorage.setItem(LS_DAILY, JSON.stringify(vocabProgressDaily || {}));
+    localStorage.setItem(LS_DAILY, JSON.stringify(vocabProgressDaily || "{}"));
     localStorage.setItem(LS_HIGHEST, JSON.stringify(vocabHighest || {}));
+    localStorage.setItem(LS_FAVORITES, JSON.stringify(vocabFavorites || {}));
   }
-  if (typeof dailyOffset === "number")
+
+  if (typeof dailyOffset === "number") {
     localStorage.setItem(LS_OFFSET, String(dailyOffset));
+  }
 
   const progress = JSON.parse(localStorage.getItem(LS_PROGRESS) || "{}");
+  const favs = JSON.parse(localStorage.getItem(LS_FAVORITES) || "{}");
+
   words.forEach((w) => {
     if (progress[w.key]) w.familiarity = progress[w.key];
+    w.isFavorite = !!favs[w.key];
   });
 
   ensureTodayBucket();
@@ -402,6 +435,7 @@ async function loadCSV() {
   text = text.replace(/^\uFEFF/, "");
   const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
   const saved = JSON.parse(localStorage.getItem(LS_PROGRESS) || "{}");
+  const favs = JSON.parse(localStorage.getItem(LS_FAVORITES) || "{}");
 
   words = parsed.data.map((r) => {
     const original = r["Original"]?.trim() || "";
@@ -421,10 +455,12 @@ async function loadCSV() {
       key,
       romaji,
       familiarity: saved[key] || "unknown",
+      isFavorite: !!favs[key],
     };
   });
   console.log(`✅ Loaded ${words.length} words`);
 }
+
 function render() {
   const jlptVal = jlptFilter.value;
   const famVal = familiarityFilter.value;
@@ -432,7 +468,8 @@ function render() {
   let filtered = words.filter(
     (w) =>
       (jlptVal === "all" || w.jlpt === jlptVal) &&
-      (famVal === "all" || w.familiarity === famVal)
+      (famVal === "all" || w.familiarity === famVal) &&
+      (!favoritesOnlyChk.checked || w.isFavorite)
   );
 
   // ✅ Sort from N5 → N1 when showing all
@@ -461,7 +498,25 @@ function createCard(word) {
 
   const header = document.createElement("div");
   header.className = "word-header";
-  header.innerHTML = `<span>${word.original}</span><span class="jlpt">${word.jlpt}</span>`;
+
+  const titleSpan = document.createElement("span");
+  titleSpan.textContent = word.original;
+
+  const jlptSpan = document.createElement("span");
+  jlptSpan.className = "jlpt";
+  jlptSpan.textContent = word.jlpt;
+
+  const favBtn = document.createElement("button");
+  favBtn.className = "fav-btn";
+  favBtn.type = "button";
+  favBtn.textContent = "★";
+  if (word.isFavorite) favBtn.classList.add("active");
+  favBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleFavorite(word.key);
+  });
+
+  header.append(titleSpan, jlptSpan, favBtn);
 
   const furigana = document.createElement("div");
   furigana.className = "furigana";
@@ -491,6 +546,38 @@ function createCard(word) {
 }
 
 /* =======================
+   Favorites Helpers
+======================= */
+function getFavoritesMap() {
+  try {
+    return JSON.parse(localStorage.getItem(LS_FAVORITES) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function saveFavoritesMap(map) {
+  localStorage.setItem(LS_FAVORITES, JSON.stringify(map));
+}
+
+function toggleFavorite(key) {
+  const word = words.find((w) => w.key === key);
+  if (!word) return;
+
+  const favs = getFavoritesMap();
+  word.isFavorite = !word.isFavorite;
+
+  if (word.isFavorite) {
+    favs[key] = true;
+  } else {
+    delete favs[key];
+  }
+
+  saveFavoritesMap(favs);
+  render();
+}
+
+/* =======================
    Familiarity
 ======================= */
 function setFamiliarity(key, newLevel) {
@@ -509,11 +596,13 @@ function setFamiliarity(key, newLevel) {
   render();
   updateStats();
 }
+
 function saveProgress() {
   const data = {};
   words.forEach((w) => (data[w.key] = w.familiarity));
   localStorage.setItem(LS_PROGRESS, JSON.stringify(data));
 }
+
 function changePage(dir) {
   currentPage += dir;
   render();
@@ -771,7 +860,13 @@ function resetProgress() {
     localStorage.removeItem(LS_DAILY);
     localStorage.removeItem(LS_HIGHEST);
     localStorage.removeItem(LS_OFFSET);
-    words.forEach((w) => (w.familiarity = "unknown"));
+    localStorage.removeItem(LS_FAVORITES);
+
+    words.forEach((w) => {
+      w.familiarity = "unknown";
+      w.isFavorite = false;
+    });
+
     ensureTodayBucket();
     updateTodayChip();
     render();

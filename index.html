@@ -11,6 +11,7 @@
       <h1>JLPT Vocabulary Tracker</h1>
 
       <div class="controls">
+        <!-- JLPT filter -->
         <label for="jlptFilter">JLPT Level:</label>
         <select id="jlptFilter">
           <option value="all">All</option>
@@ -21,6 +22,7 @@
           <option value="N5">N5</option>
         </select>
 
+        <!-- Familiarity filter -->
         <label for="familiarityFilter">Familiarity:</label>
         <select id="familiarityFilter">
           <option value="all">All</option>
@@ -30,10 +32,19 @@
           <option value="unknown">Unknown</option>
         </select>
 
+        <!-- Favorites-only toggle -->
+        <label for="favoritesOnly" style="display: flex; gap: 0.35rem">
+          <input type="checkbox" id="favoritesOnly" />
+          ⭐ Favorites only
+        </label>
+
+        <!-- Romaji toggle -->
         <label style="display: flex; gap: 0.35rem">
           <input type="checkbox" id="showRomaji" />
           Show Romaji
         </label>
+
+        <!-- Data + stats controls -->
         <button id="resetProgress">🔄 Reset Progress</button>
         <button id="exportData">⬇️ Export Data</button>
         <button id="importData">⬆️ Import Data</button>
@@ -45,23 +56,27 @@
         />
         <button id="toggleStats">📊 Show Stats</button>
 
+        <!-- Today progress chip -->
         <span id="todayChip" class="chip">Progress Points Today: 0</span>
       </div>
     </header>
 
-    <!-- Stats panel now outside controls for proper visibility -->
+    <!-- Stats panel -->
     <section id="statsPanel" class="hidden">
       <div id="statsContainer"></div>
     </section>
 
+    <!-- Main grid for word cards -->
     <main id="wordGrid"></main>
 
+    <!-- Pagination footer -->
     <footer>
       <button id="prevPage">Prev</button>
       <span id="pageInfo"></span>
       <button id="nextPage">Next</button>
     </footer>
 
+    <!-- Libraries + script -->
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <script src="script.js"></script>
   </body>
