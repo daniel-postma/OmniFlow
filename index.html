@@ -6,6 +6,7 @@
     <title>JLPT Vocabulary Tracker</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
+
   <body>
     <header>
       <h1>JLPT Vocabulary Tracker</h1>
@@ -59,6 +60,11 @@
         <!-- Today progress chip -->
         <span id="todayChip" class="chip">Progress Points Today: 0</span>
       </div>
+
+      <!-- Simple toggle button for Ko-fi widget -->
+      <button id="toggleKofi" style="margin-top: 10px">
+        Hide Support Widget
+      </button>
     </header>
 
     <!-- Stats panel -->
@@ -76,8 +82,76 @@
       <button id="nextPage">Next</button>
     </footer>
 
-    <!-- Libraries + script -->
+    <!-- Libraries + main script -->
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <script src="script.js"></script>
+
+    <!-- Ko-fi Floating Widget -->
+    <script src="https://storage.ko-fi.com/cdn/scripts/overlay-widget.js"></script>
+    <script>
+      kofiWidgetOverlay.draw("danielgagepostma", {
+        type: "floating-chat",
+        "floating-chat.donateButton.text": "Support me",
+        "floating-chat.donateButton.background-color": "#323842",
+        "floating-chat.donateButton.text-color": "#fff",
+      });
+
+      // Helper: find the Ko-fi widget container, even if the ID changes
+      function findKofiContainer() {
+        const divs = document.querySelectorAll("div[id]");
+        for (const el of divs) {
+          const id = el.id.toLowerCase();
+          if (id.includes("ko-fi") || id.includes("kofi")) {
+            return el;
+          }
+        }
+        return null;
+      }
+
+      function initKofiToggle() {
+        const toggleBtn = document.getElementById("toggleKofi");
+        if (!toggleBtn) return;
+
+        let tries = 0;
+        const maxTries = 40; // ~12 seconds at 300ms intervals
+
+        const interval = setInterval(() => {
+          const container = findKofiContainer();
+          if (!container) {
+            tries++;
+            if (tries >= maxTries) {
+              clearInterval(interval);
+            }
+            return;
+          }
+
+          clearInterval(interval);
+
+          // Load saved state
+          const hidden = localStorage.getItem("kofiHidden") === "true";
+          if (hidden) {
+            container.style.display = "none";
+            toggleBtn.textContent = "Show Support Widget";
+          } else {
+            toggleBtn.textContent = "Hide Support Widget";
+          }
+
+          toggleBtn.addEventListener("click", () => {
+            const isHidden = container.style.display === "none";
+            if (isHidden) {
+              container.style.display = "block";
+              toggleBtn.textContent = "Hide Support Widget";
+              localStorage.setItem("kofiHidden", "false");
+            } else {
+              container.style.display = "none";
+              toggleBtn.textContent = "Show Support Widget";
+              localStorage.setItem("kofiHidden", "true");
+            }
+          });
+        }, 300);
+      }
+
+      window.addEventListener("load", initKofiToggle);
+    </script>
   </body>
 </html>

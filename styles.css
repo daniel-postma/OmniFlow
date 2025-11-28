@@ -342,3 +342,12 @@ footer button {
   justify-content: space-between;
   gap: 0.5rem;
 }
+
+/* Move Ko-fi floating chat widget to the top right */
+#ko-fi-floating-chat-container {
+  bottom: auto !important;
+  top: 12px !important;
+  right: 20px !important;
+  left: auto !important;
+  transform: none !important;
+}
