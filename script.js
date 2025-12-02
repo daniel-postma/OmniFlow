@@ -79,6 +79,55 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   ensureTodayBucket();
   updateTodayChip();
+
+  /* =======================
+     Kanji Size + Bold Controls
+  ======================= */
+  const sizeSlider = document.getElementById("kanjiSize");
+  const sizeValue = document.getElementById("kanjiSizeValue");
+  const boldToggle = document.getElementById("kanjiBoldToggle");
+
+  if (sizeSlider && sizeValue && boldToggle) {
+    // Load saved values or defaults
+    const savedSize = parseFloat(localStorage.getItem("kanjiFontSize")) || 1.3;
+    const savedBold = localStorage.getItem("kanjiBold") === "true";
+
+    // Apply CSS variables
+    document.documentElement.style.setProperty(
+      "--kanji-font-size",
+      `${savedSize}rem`
+    );
+    document.documentElement.style.setProperty(
+      "--kanji-font-weight",
+      savedBold ? "700" : "400"
+    );
+
+    // Init controls
+    sizeSlider.value = savedSize;
+    sizeValue.textContent = `${savedSize.toFixed(1)}rem`;
+    boldToggle.checked = savedBold;
+
+    // Slider: adjust size live
+    sizeSlider.addEventListener("input", () => {
+      const value = parseFloat(sizeSlider.value);
+      document.documentElement.style.setProperty(
+        "--kanji-font-size",
+        `${value}rem`
+      );
+      sizeValue.textContent = `${value.toFixed(1)}rem`;
+      localStorage.setItem("kanjiFontSize", value);
+    });
+
+    // Toggle: bold on/off
+    boldToggle.addEventListener("change", () => {
+      const isBold = boldToggle.checked;
+      document.documentElement.style.setProperty(
+        "--kanji-font-weight",
+        isBold ? "700" : "400"
+      );
+      localStorage.setItem("kanjiBold", isBold ? "true" : "false");
+    });
+  }
 });
 
 /* =======================
@@ -500,6 +549,7 @@ function createCard(word) {
   header.className = "word-header";
 
   const titleSpan = document.createElement("span");
+  titleSpan.className = "kanji-main"; // 🔥 Kanji gets its own class
   titleSpan.textContent = word.original;
 
   const jlptSpan = document.createElement("span");

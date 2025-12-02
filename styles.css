@@ -51,6 +51,7 @@ main {
   justify-content: space-between;
   font-weight: bold;
   margin-bottom: 0.3rem;
+  font-size: 1.3rem;
 }
 
 .furigana {
@@ -350,4 +351,38 @@ footer button {
   right: 20px !important;
   left: auto !important;
   transform: none !important;
+}
+
+/* === Kanji display controls === */
+:root {
+  --kanji-font-size: 1.3rem; /* default */
+  --kanji-font-weight: 400; /* normal */
+}
+
+.kanji-main {
+  font-size: var(--kanji-font-size);
+  font-weight: var(--kanji-font-weight);
+  line-height: 1.1;
+  display: block;
+  margin-bottom: 0.1rem;
+}
+
+/* Optional: adjust for small screens */
+@media (max-width: 600px) {
+  .kanji-main {
+    font-size: calc(var(--kanji-font-size) * 0.9);
+  }
+}
+
+/* Small styling for the control UI (optional) */
+.kanji-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+}
+
+#kanjiSize {
+  width: 120px;
 }
