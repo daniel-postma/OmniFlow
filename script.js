@@ -406,7 +406,7 @@ function kanaToRomaji(input) {
     ぞ: "zo",
     だ: "da",
     ぢ: "ji",
-    づ: "zu",
+    づ: "dzu",
     で: "de",
     ど: "do",
     ば: "ba",
@@ -653,9 +653,21 @@ function saveProgress() {
   localStorage.setItem(LS_PROGRESS, JSON.stringify(data));
 }
 
+function scrollToBottom(behavior = "auto") {
+  const el = document.scrollingElement || document.documentElement;
+  el.scrollTo({ top: el.scrollHeight, left: 0, behavior });
+}
+
 function changePage(dir) {
-  currentPage += dir;
+  currentPage = Math.max(1, currentPage + dir);
   render();
+
+  // After the new page renders + layout settles, jump to the bottom
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      scrollToBottom("auto"); // change to "smooth" if you want animation
+    });
+  });
 }
 
 /* =======================
