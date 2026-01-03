@@ -28,8 +28,9 @@ const LS_DAILY = "vocabProgressDaily";
 const LS_HIGHEST = "vocabHighest";
 const LS_OFFSET = "dailyOffset";
 const LS_FAVORITES = "vocabFavorites";
-const LS_EXPOSED = "vocabExposed"; // { [wordKey]: ISODateString }
-const LS_FLOWMAN = "flowmanHighest"; // NEW: { [wordKey]: "easy" | "normal" | "hard" }
+const LS_EXPOSED = "vocabExposed";
+const LS_FLOWMAN = "flowmanHighest";
+const LS_FLOWMAN_BADGES = "flowmanBadges_v1"; // ✅ NEW
 
 const RANK = { unknown: 0, explored: 1, known: 2, well_known: 3 };
 const FLOW_RANK = { none: 0, easy: 1, normal: 2, hard: 3 };
@@ -145,29 +146,181 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 /* =======================
-   Game Link Routing
-   - If user has a familiarity filter (not all), open Flowman in that pool
-   - Else if JLPT filter is specific, open Flowman by JLPT
-   - Else default Level mode
+   Export / Import Core
 ======================= */
-function updateGameLinks() {
-  if (!openGameBtn && !openGameTop) return;
+function getAllData() {
+  return {
+    schema: "fluencyflow.v4", // ✅ upgraded schema
+    exportedAt: new Date().toISOString(),
+    data: {
+      vocabProgress: JSON.parse(localStorage.getItem(LS_PROGRESS) || "{}"),
+      vocabProgressDaily: JSON.parse(localStorage.getItem(LS_DAILY) || "{}"),
+      vocabHighest: JSON.parse(localStorage.getItem(LS_HIGHEST) || "{}"),
+      vocabFavorites: JSON.parse(localStorage.getItem(LS_FAVORITES) || "{}"),
+      vocabExposed: JSON.parse(localStorage.getItem(LS_EXPOSED) || "{}"),
+      flowmanHighest: JSON.parse(localStorage.getItem(LS_FLOWMAN) || "{}"),
+      flowmanBadges: JSON.parse(
+        localStorage.getItem(LS_FLOWMAN_BADGES) || "{}"
+      ), // ✅ NEW
+      dailyOffset: parseInt(localStorage.getItem(LS_OFFSET) || "0", 10),
+    },
+  };
+}
 
-  const famVal = familiarityFilter?.value || "all";
-  const jlptVal = jlptFilter?.value || "all";
+function mergeMapsPreferHigherRank(base, incoming) {
+  const res = { ...base };
+  for (const [k, v] of Object.entries(incoming || {})) {
+    const cur = base[k];
+    res[k] = (RANK[v] || 0) > (RANK[cur] || 0) ? v : cur ?? v;
+  }
+  return res;
+}
 
-  let url = "hang.html";
+function mergeDailyLog(base, incoming) {
+  const res = { ...base };
+  for (const [date, val] of Object.entries(incoming || {})) {
+    res[date] = (res[date] || 0) + (parseInt(val, 10) || 0);
+  }
+  return res;
+}
 
-  if (famVal !== "all") {
-    url += `?playBy=familiarity&fam=${encodeURIComponent(famVal)}`;
-  } else if (jlptVal !== "all") {
-    url += `?playBy=jlpt&jlpt=${encodeURIComponent(jlptVal)}`;
-  } else {
-    url += `?playBy=level&level=1`;
+function mergeExposed(base, incoming) {
+  const res = { ...base };
+  for (const [k, v] of Object.entries(incoming || {})) {
+    if (!res[k]) res[k] = v;
+    else {
+      const a = new Date(res[k]).getTime();
+      const b = new Date(v).getTime();
+      if (!Number.isNaN(b) && (Number.isNaN(a) || b < a)) res[k] = v;
+    }
+  }
+  return res;
+}
+
+function mergeFlowman(base, incoming) {
+  const res = { ...base };
+  for (const [k, v] of Object.entries(incoming || {})) {
+    const cur = base[k] || "none";
+    const next = v || "none";
+    res[k] = (FLOW_RANK[next] || 0) > (FLOW_RANK[cur] || 0) ? next : cur;
+  }
+  return res;
+}
+
+function mergeBadges(base, incoming) {
+  return { ...base, ...incoming }; // ✅ simple union merge
+}
+function exportData() {
+  const d = new Date();
+  const f = `fluencyflow_progress_${d.getFullYear()}${String(
+    d.getMonth() + 1
+  ).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}.json`;
+  const blob = new Blob([JSON.stringify(getAllData(), null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = f;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 100);
+}
+
+function importDataFromObject(obj) {
+  const schema = obj?.schema;
+  const isV1 = schema === "fluencyflow.v1";
+  const isV2 = schema === "fluencyflow.v2";
+  const isV3 = schema === "fluencyflow.v3";
+  const isV4 = schema === "fluencyflow.v4";
+  if (!isV1 && !isV2 && !isV3 && !isV4) {
+    alert("Invalid import file.");
+    return;
   }
 
-  if (openGameBtn) openGameBtn.href = url;
-  if (openGameTop) openGameTop.href = url;
+  const data = obj.data || {};
+  const vocabProgress = data.vocabProgress || {};
+  const vocabProgressDaily = data.vocabProgressDaily || {};
+  const vocabHighest = data.vocabHighest || {};
+  const vocabFavorites = data.vocabFavorites || {};
+  const vocabExposed = data.vocabExposed || {};
+  const flowmanHighest = data.flowmanHighest || {};
+  const flowmanBadges = data.flowmanBadges || {}; // ✅ NEW
+  const dailyOffset = data.dailyOffset;
+
+  const merge = confirm(
+    "Import data: OK to MERGE (keep progress) or Cancel to REPLACE?"
+  );
+
+  if (merge) {
+    const curProg = JSON.parse(localStorage.getItem(LS_PROGRESS) || "{}");
+    const curDaily = JSON.parse(localStorage.getItem(LS_DAILY) || "{}");
+    const curHigh = JSON.parse(localStorage.getItem(LS_HIGHEST) || "{}");
+    const curFavs = JSON.parse(localStorage.getItem(LS_FAVORITES) || "{}");
+    const curExposed = JSON.parse(localStorage.getItem(LS_EXPOSED) || "{}");
+    const curFlow = JSON.parse(localStorage.getItem(LS_FLOWMAN) || "{}");
+    const curBadges = JSON.parse(
+      localStorage.getItem(LS_FLOWMAN_BADGES) || "{}"
+    );
+
+    localStorage.setItem(
+      LS_PROGRESS,
+      JSON.stringify(mergeMapsPreferHigherRank(curProg, vocabProgress))
+    );
+    localStorage.setItem(
+      LS_DAILY,
+      JSON.stringify(mergeDailyLog(curDaily, vocabProgressDaily))
+    );
+    localStorage.setItem(
+      LS_HIGHEST,
+      JSON.stringify(mergeMapsPreferHigherRank(curHigh, vocabHighest))
+    );
+    localStorage.setItem(
+      LS_FAVORITES,
+      JSON.stringify({ ...curFavs, ...vocabFavorites })
+    );
+    localStorage.setItem(
+      LS_EXPOSED,
+      JSON.stringify(mergeExposed(curExposed, vocabExposed))
+    );
+    localStorage.setItem(
+      LS_FLOWMAN,
+      JSON.stringify(mergeFlowman(curFlow, flowmanHighest))
+    );
+    localStorage.setItem(
+      LS_FLOWMAN_BADGES,
+      JSON.stringify(mergeBadges(curBadges, flowmanBadges))
+    );
+  } else {
+    localStorage.setItem(LS_PROGRESS, JSON.stringify(vocabProgress));
+    localStorage.setItem(LS_DAILY, JSON.stringify(vocabProgressDaily || "{}"));
+    localStorage.setItem(LS_HIGHEST, JSON.stringify(vocabHighest));
+    localStorage.setItem(LS_FAVORITES, JSON.stringify(vocabFavorites));
+    localStorage.setItem(LS_EXPOSED, JSON.stringify(vocabExposed));
+    localStorage.setItem(LS_FLOWMAN, JSON.stringify(flowmanHighest));
+    localStorage.setItem(LS_FLOWMAN_BADGES, JSON.stringify(flowmanBadges));
+  }
+
+  if (typeof dailyOffset === "number") {
+    localStorage.setItem(LS_OFFSET, String(dailyOffset));
+  }
+
+  const progress = JSON.parse(localStorage.getItem(LS_PROGRESS) || "{}");
+  const favs = JSON.parse(localStorage.getItem(LS_FAVORITES) || "{}");
+  const exposed = JSON.parse(localStorage.getItem(LS_EXPOSED) || "{}");
+  const flow = JSON.parse(localStorage.getItem(LS_FLOWMAN) || "{}");
+
+  words.forEach((w) => {
+    if (progress[w.key]) w.familiarity = progress[w.key];
+    w.isFavorite = !!favs[w.key];
+    w.exposedAt = exposed[w.key] || null;
+    w.flowmanHighest = flow[w.key] || "none";
+  });
+
+  ensureTodayBucket();
+  updateTodayChip();
+  render();
+  updateStats();
+  alert("✅ Import complete! All progress and badges restored.");
 }
 
 /* =======================
@@ -230,177 +383,6 @@ function getExposedMap() {
 function saveExposedMap(map) {
   localStorage.setItem(LS_EXPOSED, JSON.stringify(map));
 }
-
-/* =======================
-   Export / Import
-======================= */
-function getAllData() {
-  return {
-    schema: "fluencyflow.v3",
-    exportedAt: new Date().toISOString(),
-    data: {
-      vocabProgress: JSON.parse(localStorage.getItem(LS_PROGRESS) || "{}"),
-      vocabProgressDaily: JSON.parse(localStorage.getItem(LS_DAILY) || "{}"),
-      vocabHighest: JSON.parse(localStorage.getItem(LS_HIGHEST) || "{}"),
-      vocabFavorites: JSON.parse(localStorage.getItem(LS_FAVORITES) || "{}"),
-      vocabExposed: JSON.parse(localStorage.getItem(LS_EXPOSED) || "{}"),
-      flowmanHighest: JSON.parse(localStorage.getItem(LS_FLOWMAN) || "{}"),
-      dailyOffset: parseInt(localStorage.getItem(LS_OFFSET) || "0", 10),
-    },
-  };
-}
-
-function downloadJSON(obj, name) {
-  const blob = new Blob([JSON.stringify(obj, null, 2)], {
-    type: "application/json",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 100);
-}
-
-function exportData() {
-  const d = new Date();
-  const f = `fluencyflow_progress_${d.getFullYear()}${String(
-    d.getMonth() + 1
-  ).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}.json`;
-  downloadJSON(getAllData(), f);
-}
-
-function mergeMapsPreferHigherRank(base, incoming) {
-  const res = { ...base };
-  for (const [k, v] of Object.entries(incoming || {})) {
-    const cur = base[k];
-    res[k] = (RANK[v] || 0) > (RANK[cur] || 0) ? v : cur ?? v;
-  }
-  return res;
-}
-
-function mergeDailyLog(base, incoming) {
-  const res = { ...base };
-  for (const [date, val] of Object.entries(incoming || {})) {
-    res[date] = (res[date] || 0) + (parseInt(val, 10) || 0);
-  }
-  return res;
-}
-
-function mergeExposed(base, incoming) {
-  const res = { ...base };
-  for (const [k, v] of Object.entries(incoming || {})) {
-    // keep earliest exposed date if both exist
-    if (!res[k]) res[k] = v;
-    else {
-      const a = new Date(res[k]).getTime();
-      const b = new Date(v).getTime();
-      if (!Number.isNaN(b) && (Number.isNaN(a) || b < a)) res[k] = v;
-    }
-  }
-  return res;
-}
-
-function mergeFlowman(base, incoming) {
-  const res = { ...base };
-  for (const [k, v] of Object.entries(incoming || {})) {
-    const cur = base[k] || "none";
-    const next = v || "none";
-    res[k] = (FLOW_RANK[next] || 0) > (FLOW_RANK[cur] || 0) ? next : cur;
-  }
-  return res;
-}
-
-function importDataFromObject(obj) {
-  // Accept v1, v2, v3
-  const schema = obj?.schema;
-  const isV1 = schema === "fluencyflow.v1";
-  const isV2 = schema === "fluencyflow.v2";
-  const isV3 = schema === "fluencyflow.v3";
-
-  if (!isV1 && !isV2 && !isV3) {
-    alert("Invalid import file.");
-    return;
-  }
-
-  const data = obj.data || {};
-  const vocabProgress = data.vocabProgress || {};
-  const vocabProgressDaily = data.vocabProgressDaily || {};
-  const vocabHighest = data.vocabHighest || {};
-  const vocabFavorites = data.vocabFavorites || {};
-  const vocabExposed = data.vocabExposed || {}; // absent in v1 ok
-  const flowmanHighest = data.flowmanHighest || {}; // absent in v1/v2 ok
-  const dailyOffset = data.dailyOffset;
-
-  const merge = confirm(
-    "Import data: OK to MERGE (keep progress) or Cancel to REPLACE?"
-  );
-
-  if (merge) {
-    const curProg = JSON.parse(localStorage.getItem(LS_PROGRESS) || "{}");
-    const curDaily = JSON.parse(localStorage.getItem(LS_DAILY) || "{}");
-    const curHigh = JSON.parse(localStorage.getItem(LS_HIGHEST) || "{}");
-    const curFavs = JSON.parse(localStorage.getItem(LS_FAVORITES) || "{}");
-    const curExposed = JSON.parse(localStorage.getItem(LS_EXPOSED) || "{}");
-    const curFlow = JSON.parse(localStorage.getItem(LS_FLOWMAN) || "{}");
-
-    localStorage.setItem(
-      LS_PROGRESS,
-      JSON.stringify(mergeMapsPreferHigherRank(curProg, vocabProgress))
-    );
-    localStorage.setItem(
-      LS_DAILY,
-      JSON.stringify(mergeDailyLog(curDaily, vocabProgressDaily))
-    );
-    localStorage.setItem(
-      LS_HIGHEST,
-      JSON.stringify(mergeMapsPreferHigherRank(curHigh, vocabHighest))
-    );
-    localStorage.setItem(
-      LS_FAVORITES,
-      JSON.stringify({ ...curFavs, ...vocabFavorites })
-    );
-    localStorage.setItem(
-      LS_EXPOSED,
-      JSON.stringify(mergeExposed(curExposed, vocabExposed))
-    );
-    localStorage.setItem(
-      LS_FLOWMAN,
-      JSON.stringify(mergeFlowman(curFlow, flowmanHighest))
-    );
-  } else {
-    localStorage.setItem(LS_PROGRESS, JSON.stringify(vocabProgress));
-    localStorage.setItem(LS_DAILY, JSON.stringify(vocabProgressDaily || "{}"));
-    localStorage.setItem(LS_HIGHEST, JSON.stringify(vocabHighest));
-    localStorage.setItem(LS_FAVORITES, JSON.stringify(vocabFavorites));
-    localStorage.setItem(LS_EXPOSED, JSON.stringify(vocabExposed));
-    localStorage.setItem(LS_FLOWMAN, JSON.stringify(flowmanHighest));
-  }
-
-  if (typeof dailyOffset === "number") {
-    localStorage.setItem(LS_OFFSET, String(dailyOffset));
-  }
-
-  // Re-apply to in-memory words
-  const progress = JSON.parse(localStorage.getItem(LS_PROGRESS) || "{}");
-  const favs = JSON.parse(localStorage.getItem(LS_FAVORITES) || "{}");
-  const exposed = JSON.parse(localStorage.getItem(LS_EXPOSED) || "{}");
-  const flow = JSON.parse(localStorage.getItem(LS_FLOWMAN) || "{}");
-
-  words.forEach((w) => {
-    if (progress[w.key]) w.familiarity = progress[w.key];
-    w.isFavorite = !!favs[w.key];
-    w.exposedAt = exposed[w.key] || null;
-    w.flowmanHighest = flow[w.key] || "none";
-  });
-
-  ensureTodayBucket();
-  updateTodayChip();
-  render();
-  updateStats();
-  alert("✅ Import complete! All progress and stats restored.");
-}
-
 /* =======================
    CSV + Rendering
 ======================= */
@@ -531,7 +513,7 @@ function kanaToRomaji(input) {
     ぅ: "u",
     ぇ: "e",
     ぉ: "o",
-    ー: "-", // long mark
+    ー: "-",
   };
 
   let out = "";
@@ -577,7 +559,7 @@ function kanaToRomaji(input) {
 async function loadCSV() {
   const res = await fetch("jlpt_vocab.csv");
   let text = await res.text();
-  text = text.replace(/^\uFEFF/, "");
+  text = text.replace(/^\\uFEFF/, "");
   const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
 
   const saved = JSON.parse(localStorage.getItem(LS_PROGRESS) || "{}");
@@ -703,7 +685,6 @@ function createCard(word) {
 
   titleWrap.append(titleSpan, jlptSpan, flow);
   header.append(titleWrap, favBtn);
-
   const furigana = document.createElement("div");
   furigana.className = "furigana";
   furigana.textContent = word.furigana;
@@ -804,7 +785,6 @@ function changePage(dir) {
     });
   });
 }
-
 /* =======================
    Stats + Graph + Reset
 ======================= */
@@ -1050,7 +1030,7 @@ function updateStats() {
 function resetProgress() {
   if (
     confirm(
-      "Reset ALL progress, stats, points, favorites, exposed, and Flowman completion? This cannot be undone."
+      "Reset ALL progress, stats, points, favorites, exposed, Flowman completion, and badges? This cannot be undone."
     )
   ) {
     localStorage.removeItem(LS_PROGRESS);
@@ -1060,6 +1040,7 @@ function resetProgress() {
     localStorage.removeItem(LS_FAVORITES);
     localStorage.removeItem(LS_EXPOSED);
     localStorage.removeItem(LS_FLOWMAN);
+    localStorage.removeItem(LS_FLOWMAN_BADGES); // ✅ NEW
 
     words.forEach((w) => {
       w.familiarity = "unknown";
@@ -1075,3 +1056,48 @@ function resetProgress() {
     alert("Progress fully reset.");
   }
 }
+/* =======================
+   Game Link Routing
+======================= */
+function updateGameLinks() {
+  if (!openGameBtn && !openGameTop) return;
+
+  const famVal = familiarityFilter?.value || "all";
+  const jlptVal = jlptFilter?.value || "all";
+
+  let url = "hang.html";
+
+  if (famVal !== "all") {
+    url += `?playBy=familiarity&fam=${encodeURIComponent(famVal)}`;
+  } else if (jlptVal !== "all") {
+    url += `?playBy=jlpt&jlpt=${encodeURIComponent(jlptVal)}`;
+  } else {
+    url += `?playBy=level&level=1`;
+  }
+
+  if (openGameBtn) openGameBtn.href = url;
+  if (openGameTop) openGameTop.href = url;
+}
+
+/* =======================
+   Utility - Safe Get/Set
+======================= */
+function safeGet(key, fallback = "{}") {
+  try {
+    return JSON.parse(localStorage.getItem(key) || fallback);
+  } catch {
+    return JSON.parse(fallback);
+  }
+}
+
+function safeSet(key, obj) {
+  localStorage.setItem(key, JSON.stringify(obj));
+}
+
+/* =======================
+   Initialization Complete
+======================= */
+console.log(
+  "%c✅ FluencyFlow initialized with v4 schema (Flowman badges supported).",
+  "color:#22c55e;font-weight:bold;"
+);
