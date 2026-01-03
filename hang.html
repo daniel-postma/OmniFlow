@@ -4,569 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>JLPT Hangman</title>
-    <style>
-      :root {
-        --bg: #0b0f17;
-        --text: #e7eefc;
-        --muted: #a9b7d6;
-        --accent: #7aa2ff;
-        --danger: #ff6b6b;
-        --ok: #4fe3a5;
-        --radius: 16px;
-        --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-      }
-      * {
-        box-sizing: border-box;
-      }
-      body {
-        margin: 0;
-        padding: 16px;
-        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
-          Helvetica, Arial;
-        background: radial-gradient(
-            1200px 600px at 20% 10%,
-            rgba(122, 162, 255, 0.18),
-            transparent 60%
-          ),
-          radial-gradient(
-            1000px 500px at 90% 20%,
-            rgba(79, 227, 165, 0.14),
-            transparent 55%
-          ),
-          var(--bg);
-        color: var(--text);
-        min-height: 100vh;
-        display: flex;
-        justify-content: center;
-      }
-      .app {
-        width: min(1100px, 100%);
-        display: grid;
-        grid-template-columns: 1.1fr 0.9fr;
-        gap: 16px;
-      }
-      @media (max-width: 900px) {
-        .app {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      .card {
-        background: linear-gradient(
-          180deg,
-          rgba(255, 255, 255, 0.03),
-          rgba(255, 255, 255, 0.01)
-        );
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow);
-        overflow: hidden;
-      }
-      .cardHeader {
-        padding: 14px 16px;
-        background: rgba(255, 255, 255, 0.03);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-        flex-wrap: wrap;
-      }
-      .title {
-        font-weight: 900;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-      .content {
-        padding: 16px;
-      }
-      .row {
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        flex-wrap: wrap;
-      }
-
-      .btn {
-        appearance: none;
-        cursor: pointer;
-        user-select: none;
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        background: rgba(0, 0, 0, 0.18);
-        color: var(--text);
-        padding: 10px 12px;
-        border-radius: 12px;
-        font-weight: 800;
-        transition: transform 0.05s ease, border-color 0.15s ease,
-          background 0.15s ease;
-      }
-      .btn:hover {
-        border-color: rgba(122, 162, 255, 0.6);
-        background: rgba(122, 162, 255, 0.1);
-      }
-      .btn:active {
-        transform: translateY(1px);
-      }
-      .btn.ok {
-        border-color: rgba(79, 227, 165, 0.6);
-        background: rgba(79, 227, 165, 0.1);
-      }
-      .btn.danger {
-        border-color: rgba(255, 107, 107, 0.7);
-        background: rgba(255, 107, 107, 0.1);
-      }
-      .btn:disabled {
-        opacity: 0.45;
-        cursor: not-allowed;
-      }
-
-      select,
-      input[type="text"] {
-        padding: 10px 12px;
-        border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        background: rgba(0, 0, 0, 0.2);
-        color: var(--text);
-        outline: none;
-        font-weight: 700;
-      }
-      .labelTiny {
-        color: var(--muted);
-        font-size: 12px;
-        font-weight: 900;
-      }
-
-      .toggle {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 10px;
-        border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        background: rgba(0, 0, 0, 0.14);
-      }
-      .toggle input[type="checkbox"] {
-        width: 16px;
-        height: 16px;
-        accent-color: var(--accent);
-      }
-
-      .bigKanji {
-        font-size: 56px;
-        font-weight: 950;
-        line-height: 1.05;
-        margin: 6px 0 6px;
-        word-break: break-word;
-      }
-      .meaning {
-        margin: 0 0 10px;
-        color: var(--muted);
-        font-size: 18px;
-      }
-      .meaning.hard {
-        color: var(--text);
-        font-size: 30px;
-        font-weight: 950;
-        line-height: 1.2;
-        margin-top: 8px;
-      }
-      .subline {
-        color: var(--muted);
-        font-size: 13px;
-        margin: 0 0 14px;
-      }
-
-      .blanks {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        align-items: flex-end;
-        margin: 12px 0 16px;
-        min-height: 56px;
-      }
-      .slot {
-        width: 34px;
-        height: 46px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 12px;
-        background: rgba(0, 0, 0, 0.18);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        font-size: 22px;
-        font-weight: 950;
-        text-transform: lowercase;
-      }
-      .slot.revealed {
-        border-color: rgba(79, 227, 165, 0.55);
-        background: rgba(79, 227, 165, 0.08);
-      }
-
-      .guessBar {
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        flex-wrap: wrap;
-      }
-
-      .kbdHint {
-        color: var(--muted);
-        font-size: 12px;
-        margin-top: 10px;
-      }
-      .kbdWrap {
-        margin-top: 10px;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-      .kbdRow {
-        display: flex;
-        gap: 8px;
-        justify-content: center;
-        flex-wrap: nowrap;
-      }
-      .key {
-        padding: 10px 0;
-        border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.14);
-        background: rgba(0, 0, 0, 0.16);
-        color: var(--text);
-        font-weight: 950;
-        cursor: pointer;
-        text-transform: lowercase;
-        user-select: none;
-        min-width: 34px;
-        flex: 1 1 0px;
-      }
-      .key:hover {
-        border-color: rgba(122, 162, 255, 0.55);
-        background: rgba(122, 162, 255, 0.1);
-      }
-      .key.used {
-        opacity: 0.35;
-        cursor: not-allowed;
-      }
-      .key.good {
-        border-color: rgba(79, 227, 165, 0.55);
-        background: rgba(79, 227, 165, 0.08);
-      }
-      .key.bad {
-        border-color: rgba(255, 107, 107, 0.6);
-        background: rgba(255, 107, 107, 0.1);
-      }
-      .key.wide {
-        flex: 2 1 0px;
-      }
-      .key.kana {
-        text-transform: none;
-        font-weight: 900;
-      }
-
-      .kbdWrap.kanaDock {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
-      }
-      @media (max-width: 900px) {
-        .kbdWrap.kanaDock {
-          grid-template-columns: 1fr;
-        }
-      }
-      .kbdCol {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-      .kbdControls {
-        grid-column: 1 / -1;
-        display: flex;
-        justify-content: center;
-      }
-
-      .mcqArea {
-        margin-top: 14px;
-        display: none;
-      }
-      .mcqGrid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 10px;
-        margin-top: 10px;
-      }
-      @media (max-width: 700px) {
-        .mcqGrid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-      }
-      .mcqBtn {
-        border-radius: 14px;
-        border: 1px solid rgba(255, 255, 255, 0.14);
-        background: rgba(0, 0, 0, 0.18);
-        color: var(--text);
-        padding: 12px 10px;
-        font-weight: 950;
-        cursor: pointer;
-        user-select: none;
-        text-align: center;
-      }
-      .mcqBtn:hover {
-        border-color: rgba(122, 162, 255, 0.55);
-        background: rgba(122, 162, 255, 0.1);
-      }
-      .mcqBtn.bad {
-        border-color: rgba(255, 107, 107, 0.7);
-        background: rgba(255, 107, 107, 0.1);
-        opacity: 0.55;
-        cursor: not-allowed;
-      }
-      .mcqBtn.good {
-        border-color: rgba(79, 227, 165, 0.6);
-        background: rgba(79, 227, 165, 0.1);
-      }
-
-      .rightPanel {
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-      }
-      .artWrap {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(0, 0, 0, 0.18);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 16px;
-        padding: 12px;
-        min-height: 280px;
-        position: relative;
-        overflow: hidden;
-      }
-      canvas {
-        width: 240px;
-        height: 240px;
-        image-rendering: pixelated;
-        border-radius: 12px;
-        background: rgba(0, 0, 0, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-      }
-      .artFallback {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        padding: 18px;
-        color: var(--muted);
-        font-weight: 900;
-        line-height: 1.4;
-      }
-
-      .statGrid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 10px;
-        margin-bottom: 12px;
-      }
-      @media (max-width: 700px) {
-        .statGrid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-      }
-      .stat {
-        background: rgba(0, 0, 0, 0.14);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 14px;
-        padding: 10px 12px;
-      }
-      .stat .label {
-        font-size: 12px;
-        color: var(--muted);
-        margin-bottom: 2px;
-      }
-      .stat .value {
-        font-size: 20px;
-        font-weight: 950;
-      }
-
-      .toast {
-        margin-top: 12px;
-        padding: 10px 12px;
-        border-radius: 14px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        background: rgba(0, 0, 0, 0.18);
-        color: var(--muted);
-        min-height: 44px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-      .dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.25);
-      }
-      .dot.ok {
-        background: rgba(79, 227, 165, 0.7);
-      }
-      .dot.bad {
-        background: rgba(255, 107, 107, 0.8);
-      }
-
-      .keyboardDock {
-        grid-column: 1 / -1;
-      }
-      .keyboardDock .content {
-        padding: 14px 16px;
-      }
-      .keyboardDock .kbdHint {
-        margin-top: 0;
-      }
-      .keyboardDock .kbdWrap {
-        margin-top: 10px;
-      }
-      .keyboardDock .key {
-        min-width: 44px;
-        padding: 12px 0;
-        font-size: 18px;
-      }
-      .keyboardDock .kbdRow {
-        gap: 10px;
-      }
-
-      .miniLink {
-        text-decoration: none;
-        color: var(--text);
-        font-weight: 900;
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        background: rgba(0, 0, 0, 0.18);
-        padding: 10px 12px;
-        border-radius: 12px;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-      }
-      .miniLink:hover {
-        border-color: rgba(122, 162, 255, 0.6);
-        background: rgba(122, 162, 255, 0.1);
-      }
-
-      /* ===== Timer pill (hidden until progress) ===== */
-      .timerPill {
-        margin-top: 10px;
-        padding: 10px 12px;
-        border-radius: 14px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        background: rgba(0, 0, 0, 0.18);
-        color: var(--text);
-        font-weight: 950;
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-      }
-      .timerPill .tiny {
-        font-size: 12px;
-        color: var(--muted);
-        font-weight: 900;
-      }
-
-      /* ===== End-of-level modal ===== */
-      .modalOverlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.6);
-        display: none;
-        align-items: center;
-        justify-content: center;
-        padding: 18px;
-        z-index: 9999;
-      }
-      .modalCard {
-        width: min(560px, 100%);
-        background: linear-gradient(
-          180deg,
-          rgba(255, 255, 255, 0.05),
-          rgba(255, 255, 255, 0.02)
-        );
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 18px;
-        box-shadow: var(--shadow);
-        overflow: hidden;
-      }
-      .modalHeader {
-        padding: 14px 16px;
-        background: rgba(255, 255, 255, 0.03);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-      }
-      .modalTitle {
-        font-weight: 950;
-        font-size: 18px;
-      }
-      .modalBody {
-        padding: 16px;
-      }
-      .modalGrid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px;
-        margin-bottom: 12px;
-      }
-      @media (max-width: 560px) {
-        .modalGrid {
-          grid-template-columns: 1fr;
-        }
-      }
-      .modalStat {
-        background: rgba(0, 0, 0, 0.16);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 14px;
-        padding: 10px 12px;
-      }
-      .modalStat .k {
-        color: var(--muted);
-        font-size: 12px;
-        font-weight: 900;
-        margin-bottom: 2px;
-      }
-      .modalStat .v {
-        font-weight: 950;
-        font-size: 18px;
-      }
-      .starsLine {
-        margin: 10px 0 4px;
-        font-size: 22px;
-        font-weight: 950;
-        letter-spacing: 1px;
-      }
-      .projection {
-        margin-top: 10px;
-        padding: 12px;
-        border-radius: 14px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        background: rgba(0, 0, 0, 0.16);
-        color: var(--text);
-        font-weight: 800;
-        line-height: 1.45;
-      }
-      .projection .muted {
-        color: var(--muted);
-        font-weight: 900;
-      }
-      .modalActions {
-        padding: 14px 16px;
-        border-top: 1px solid rgba(255, 255, 255, 0.08);
-        display: flex;
-        justify-content: flex-end;
-        gap: 10px;
-      }
-    </style>
+    <link rel="stylesheet" href="hang.css" />
   </head>
 
   <body>
@@ -629,11 +67,11 @@
           </div>
 
           <div id="gameArea">
+            <!-- ✅ Furigana moved ABOVE kanji; label removed -->
+            <p class="subline" id="furiganaLine" style="display: none">—</p>
+
             <div class="bigKanji" id="kanjiText">—</div>
             <p class="meaning" id="meaningText">—</p>
-            <p class="subline" id="furiganaLine" style="display: none">
-              Furigana: —
-            </p>
 
             <div class="blanks" id="blanks"></div>
 
@@ -1376,7 +814,7 @@
           ざ: "za",
           じ: "ji",
           ず: "zu",
-          ぜ: "ze",
+          ぜ: "se",
           ぞ: "zo",
           だ: "da",
           ぢ: "ji",
@@ -1819,6 +1257,7 @@
         btnHint.style.display = "inline-block";
         btnSkip.style.display = "inline-block";
 
+        // ✅ Default: hide; easy-mode can show above kanji
         furiganaLine.style.display = "none";
 
         if (mode === "easy") {
@@ -1901,7 +1340,8 @@
 
         kanjiText.textContent = "—";
         meaningText.textContent = "—";
-        furiganaLine.textContent = "Furigana: —";
+        // ✅ label removed
+        furiganaLine.textContent = "—";
 
         setFrameByWrong();
         applyModeUI();
@@ -1940,8 +1380,6 @@
       }
 
       function currentJlptForSelection() {
-        // For this game, the level slice is usually all one JLPT (N5..N1 blocks).
-        // We'll use the first word's jlpt as the "current JLPT track".
         const w = (levelSlice && levelSlice[0]) || null;
         return (w && w.jlpt) || "OTHER";
       }
@@ -2005,16 +1443,13 @@
         const tJlpt = msToHMS(msNeededForWordsAtWpm(remainJlpt, wpm));
         const tUnk = msToHMS(msNeededForWordsAtWpm(remainUnknown, wpm));
 
-        // === smarter adaptive badge projection ===
         let projText1 = "";
         let projText2 = "";
 
         if (getMode() === "easy") {
-          // exposure-focused
           projText1 = `${tJlpt} to expose yourself to the rest of the ${jlpt} vocab (${remainJlpt})`;
           projText2 = `${tUnk} to expose yourself to all remaining unknown vocab (${remainUnknown})`;
         } else if (getMode() === "normal") {
-          // learning-focused: exposed → known
           const progress = ffReadJSON(FF_LS_PROGRESS, "{}");
           const exposedWords = Object.values(progress).filter(
             (v) => v === "explored"
@@ -2023,7 +1458,6 @@
           projText1 = `${timeToKnown} to make all exposed words known (${exposedWords})`;
           projText2 = `${tUnk} to expose all remaining unknown vocab (${remainUnknown})`;
         } else if (getMode() === "hard") {
-          // mastery-focused: known → well_known
           const progress = ffReadJSON(FF_LS_PROGRESS, "{}");
           const knownWords = Object.values(progress).filter(
             (v) => v === "known"
@@ -2057,7 +1491,6 @@
         const remainJlpt = countRemainingJlptNotExposed(jlpt);
         const remainUnknown = countRemainingUnknownOverall();
 
-        // Save badges for import/export
         awardBadgesForRun({
           jlpt,
           mode: getMode(),
@@ -2087,7 +1520,6 @@
 
         current = levelWords[idx];
 
-        // record exposure as soon as the word appears
         try {
           if (current) ffRecordExposure(current);
         } catch (e) {}
@@ -2100,7 +1532,9 @@
 
         kanjiText.textContent = current.kanji;
         meaningText.textContent = current.meaning;
-        furiganaLine.textContent = `Furigana: ${current.furigana || "—"}`;
+
+        // ✅ label removed: only the furigana itself
+        furiganaLine.textContent = current.furigana || "—";
 
         targetKanaNorm = normalizeKana(current.furiganaH);
         targetRomaji =
@@ -2178,7 +1612,6 @@
         solved++;
         streak++;
 
-        // ✅ show timer only after progress
         ensureTimerVisibleAfterProgress();
 
         updateStats();
@@ -2478,7 +1911,6 @@
         hideEndModal();
       });
 
-      // Clicking outside modal card closes it (optional)
       endModal.addEventListener("click", (e) => {
         if (e.target === endModal) hideEndModal();
       });
