@@ -4,7 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>JLPT Hangman</title>
-    <link rel="stylesheet" href="hang.css" />
+    <!-- ✅ theme stylesheet can be swapped (hang.css / hangdark.css) -->
+    <link id="themeStylesheet" rel="stylesheet" href="hang.css" />
   </head>
 
   <body>
@@ -68,10 +69,10 @@
 
           <div id="gameArea">
             <!-- ✅ Furigana moved ABOVE kanji; label removed -->
-            <p class="subline" id="furiganaLine" style="display: none">—</p>
+            <p class="subline" id="furiganaLine" style="display: none"></p>
 
-            <div class="bigKanji" id="kanjiText">—</div>
-            <p class="meaning" id="meaningText">—</p>
+            <div class="bigKanji" id="kanjiText"></div>
+            <p class="meaning" id="meaningText"></p>
 
             <div class="blanks" id="blanks"></div>
 
@@ -111,7 +112,13 @@
       <!-- RIGHT: STATS + ANIMATION + MUTE -->
       <aside class="rightPanel">
         <section class="card">
-          <div class="cardHeader" style="justify-content: flex-end">
+          <div class="cardHeader" style="justify-content: flex-end; gap: 10px">
+            <!-- ✅ Theme toggle -->
+            <label class="toggle" title="Toggle dark mode">
+              <input id="toggleTheme" type="checkbox" />
+              <span class="labelTiny">Dark Mode</span>
+            </label>
+
             <label class="toggle">
               <input id="muteMusic" type="checkbox" />
               <span class="labelTiny">Mute Music</span>
@@ -180,7 +187,7 @@
       <div class="modalCard" role="dialog" aria-modal="true">
         <div class="modalHeader">
           <div class="modalTitle" id="endTitle">Level Complete!</div>
-          <div class="labelTiny" id="endSub">—</div>
+          <div class="labelTiny" id="endSub"></div>
         </div>
         <div class="modalBody">
           <div class="modalGrid">
@@ -206,8 +213,8 @@
 
           <div class="projection" id="endProjection">
             <div class="muted">At this pace…</div>
-            <div id="projJlpt">—</div>
-            <div id="projUnknown" style="margin-top: 6px">—</div>
+            <div id="projJlpt"></div>
+            <div id="projUnknown" style="margin-top: 6px"></div>
           </div>
         </div>
         <div class="modalActions">
@@ -257,6 +264,10 @@
       const muteMusic = document.getElementById("muteMusic");
       const bgm = document.getElementById("bgm");
 
+      // ✅ Theme
+      const toggleTheme = document.getElementById("toggleTheme");
+      const themeStylesheet = document.getElementById("themeStylesheet");
+
       const spriteCanvas = document.getElementById("spriteCanvas");
       const ctx = spriteCanvas.getContext("2d");
       const artFallback = document.getElementById("artFallback");
@@ -304,6 +315,11 @@
       const STAR_1_WPM = 8;
       const STAR_2_WPM = 12;
       const STAR_3_WPM = 15;
+
+      // ✅ Theme config
+      const LS_THEME = "flowmanTheme"; // "light" | "dark"
+      const THEME_LIGHT = "hang.css";
+      const THEME_DARK = "hangdark.css";
 
       const QWERTY_ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
 
@@ -492,6 +508,19 @@
         return MAX_WRONG_EASY;
       }
 
+      // ✅ Theme helpers
+      function getSavedTheme() {
+        const t = localStorage.getItem(LS_THEME);
+        return t === "dark" ? "dark" : "light";
+      }
+      function applyTheme(theme) {
+        const isDark = theme === "dark";
+        if (themeStylesheet)
+          themeStylesheet.href = isDark ? THEME_DARK : THEME_LIGHT;
+        if (toggleTheme) toggleTheme.checked = isDark;
+        localStorage.setItem(LS_THEME, isDark ? "dark" : "light");
+      }
+
       function setToast(type, msg) {
         toastText.textContent = msg;
         toastDot.classList.remove("ok", "bad");
@@ -527,8 +556,11 @@
         } catch (e) {}
       }
 
+      // ======== ROMAJI NORMALIZATION (ACCEPT VARIANTS) ========
+      // Keep canonical answers the same (your kanaToRomaji output),
+      // but accept common variant spellings from users.
       function normalizeRomaji(s) {
-        return (s || "")
+        const base = (s || "")
           .toLowerCase()
           .trim()
           .replace(/[’']/g, "")
@@ -538,6 +570,31 @@
           .replace(/ū/g, "uu")
           .replace(/ē/g, "ee")
           .replace(/ō/g, "ou");
+
+        // Convert common variants -> your canonical hepburn-ish forms
+        // (so "jyo" matches target "jo", etc.)
+        return (
+          base
+            // ya/yu/yo series (people type y)
+            .replace(/jya/g, "ja")
+            .replace(/jyu/g, "ju")
+            .replace(/jyo/g, "jo")
+            .replace(/sya/g, "sha")
+            .replace(/syu/g, "shu")
+            .replace(/syo/g, "sho")
+            .replace(/tya/g, "cha")
+            .replace(/tyu/g, "chu")
+            .replace(/tyo/g, "cho")
+            // optional: kunrei "zya/zyu/zyo"
+            .replace(/zya/g, "ja")
+            .replace(/zyu/g, "ju")
+            .replace(/zyo/g, "jo")
+            // common alt for じ/ぢ
+            .replace(/zi/g, "ji")
+            // common alt for づ
+            .replace(/dzu/g, "zu")
+            .replace(/du/g, "zu")
+        );
       }
 
       function normalizeKana(s) {
@@ -650,7 +707,7 @@
       }
 
       function starString(n) {
-        if (n <= 0) return "—";
+        if (n <= 0) return "";
         return "⭐".repeat(n);
       }
 
@@ -1128,8 +1185,8 @@
             : "";
 
           const w = {
-            kanji: kanji || "—",
-            meaning: meaning || "—",
+            kanji: kanji || "",
+            meaning: meaning || "",
             furigana: furigana || "",
             furiganaH: furiganaH || "",
             romaji,
@@ -1338,10 +1395,10 @@
         blanksEl.innerHTML = "";
         mcqGrid.innerHTML = "";
 
-        kanjiText.textContent = "—";
-        meaningText.textContent = "—";
+        kanjiText.textContent = "";
+        meaningText.textContent = "";
         // ✅ label removed
-        furiganaLine.textContent = "—";
+        furiganaLine.textContent = "";
 
         setFrameByWrong();
         applyModeUI();
@@ -1534,9 +1591,12 @@
         meaningText.textContent = current.meaning;
 
         // ✅ label removed: only the furigana itself
-        furiganaLine.textContent = current.furigana || "—";
+        furiganaLine.textContent = current.furigana || "";
 
         targetKanaNorm = normalizeKana(current.furiganaH);
+
+        // IMPORTANT: normalizeRomaji now also folds user variants,
+        // but for targets that's fine (keeps canonical style stable).
         targetRomaji =
           current.romaji || normalizeRomaji(kanaToRomaji(current.furiganaH));
 
@@ -1582,10 +1642,10 @@
 
           const answer =
             current && (current.kanji || current.furigana)
-              ? `${current.kanji || "—"} / ${current.furigana || "—"}`
+              ? `${current.kanji || ""} / ${current.furigana || ""}`
               : current
-              ? current.furigana || targetRomaji || "—"
-              : "—";
+              ? current.furigana || targetRomaji || ""
+              : "";
 
           setToast("bad", `Out of lives. Answer: ${answer}`);
 
@@ -1691,6 +1751,8 @@
         if (mode === "easy") {
           const romajiGuess = normalizeRomaji(raw);
           if (!romajiGuess) return;
+
+          // ✅ now accepts variants like jyo -> jo, syo -> sho, tyo -> cho, zi -> ji, etc.
           if (romajiGuess === targetRomaji) {
             winWord();
           } else {
@@ -1767,9 +1829,7 @@
           const b = document.createElement("button");
           b.className = "mcqBtn";
           b.textContent =
-            mode === "kanji"
-              ? w.kanji || "—"
-              : w.furigana || w.furiganaH || "—";
+            mode === "kanji" ? w.kanji || "" : w.furigana || w.furiganaH || "";
           b.addEventListener("click", () => {
             onMCQPick(w, b);
           });
@@ -1833,8 +1893,8 @@
         streak = 0;
         setToast(
           "bad",
-          `Skipped. Answer: ${current.kanji || "—"} / ${
-            current.furigana || targetRomaji || "—"
+          `Skipped. Answer: ${current.kanji || ""} / ${
+            current.furigana || targetRomaji || ""
           }`
         );
         updateStats();
@@ -1907,6 +1967,11 @@
 
       muteMusic.addEventListener("change", applyMuteState);
 
+      // ✅ Theme toggle event
+      toggleTheme.addEventListener("change", () => {
+        applyTheme(toggleTheme.checked ? "dark" : "light");
+      });
+
       endOk.addEventListener("click", () => {
         hideEndModal();
       });
@@ -1928,6 +1993,7 @@
 
       // ========= Init =========
       initSprite();
+      applyTheme(getSavedTheme());
       applyMuteState();
       placeKeyboard();
       applyModeUI();
