@@ -20,13 +20,19 @@ const toggleStats = document.getElementById("toggleStats");
 const showRomajiChk = document.getElementById("showRomaji");
 const favoritesOnlyChk = document.getElementById("favoritesOnly");
 
+const openGameBtn = document.getElementById("openGameBtn");
+const openGameTop = document.getElementById("openGameTop");
+
 const LS_PROGRESS = "vocabProgress";
 const LS_DAILY = "vocabProgressDaily";
 const LS_HIGHEST = "vocabHighest";
 const LS_OFFSET = "dailyOffset";
 const LS_FAVORITES = "vocabFavorites";
+const LS_EXPOSED = "vocabExposed"; // { [wordKey]: ISODateString }
+const LS_FLOWMAN = "flowmanHighest"; // NEW: { [wordKey]: "easy" | "normal" | "hard" }
 
 const RANK = { unknown: 0, explored: 1, known: 2, well_known: 3 };
+const FLOW_RANK = { none: 0, easy: 1, normal: 2, hard: 3 };
 
 /* =======================
    DOM Load
@@ -34,10 +40,23 @@ const RANK = { unknown: 0, explored: 1, known: 2, well_known: 3 };
 document.addEventListener("DOMContentLoaded", async () => {
   await loadCSV();
   render();
+  updateGameLinks();
 
-  jlptFilter.addEventListener("change", render);
-  familiarityFilter.addEventListener("change", render);
-  favoritesOnlyChk.addEventListener("change", render);
+  jlptFilter.addEventListener("change", () => {
+    currentPage = 1;
+    render();
+    updateGameLinks();
+  });
+  familiarityFilter.addEventListener("change", () => {
+    currentPage = 1;
+    render();
+    updateGameLinks();
+  });
+  favoritesOnlyChk.addEventListener("change", () => {
+    currentPage = 1;
+    render();
+  });
+
   prevBtn.addEventListener("click", () => changePage(-1));
   nextBtn.addEventListener("click", () => changePage(1));
   showRomajiChk.addEventListener("change", render);
@@ -88,11 +107,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const boldToggle = document.getElementById("kanjiBoldToggle");
 
   if (sizeSlider && sizeValue && boldToggle) {
-    // Load saved values or defaults
     const savedSize = parseFloat(localStorage.getItem("kanjiFontSize")) || 1.3;
     const savedBold = localStorage.getItem("kanjiBold") === "true";
 
-    // Apply CSS variables
     document.documentElement.style.setProperty(
       "--kanji-font-size",
       `${savedSize}rem`
@@ -102,12 +119,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       savedBold ? "700" : "400"
     );
 
-    // Init controls
     sizeSlider.value = savedSize;
     sizeValue.textContent = `${savedSize.toFixed(1)}rem`;
     boldToggle.checked = savedBold;
 
-    // Slider: adjust size live
     sizeSlider.addEventListener("input", () => {
       const value = parseFloat(sizeSlider.value);
       document.documentElement.style.setProperty(
@@ -118,7 +133,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       localStorage.setItem("kanjiFontSize", value);
     });
 
-    // Toggle: bold on/off
     boldToggle.addEventListener("change", () => {
       const isBold = boldToggle.checked;
       document.documentElement.style.setProperty(
@@ -129,6 +143,32 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 });
+
+/* =======================
+   Game Link Routing
+   - If user has a familiarity filter (not all), open Flowman in that pool
+   - Else if JLPT filter is specific, open Flowman by JLPT
+   - Else default Level mode
+======================= */
+function updateGameLinks() {
+  if (!openGameBtn && !openGameTop) return;
+
+  const famVal = familiarityFilter?.value || "all";
+  const jlptVal = jlptFilter?.value || "all";
+
+  let url = "hang.html";
+
+  if (famVal !== "all") {
+    url += `?playBy=familiarity&fam=${encodeURIComponent(famVal)}`;
+  } else if (jlptVal !== "all") {
+    url += `?playBy=jlpt&jlpt=${encodeURIComponent(jlptVal)}`;
+  } else {
+    url += `?playBy=level&level=1`;
+  }
+
+  if (openGameBtn) openGameBtn.href = url;
+  if (openGameTop) openGameTop.href = url;
+}
 
 /* =======================
    Date + Progress Helpers
@@ -177,17 +217,34 @@ function updateTodayChip() {
 }
 
 /* =======================
+   Exposed Map
+======================= */
+function getExposedMap() {
+  try {
+    return JSON.parse(localStorage.getItem(LS_EXPOSED) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function saveExposedMap(map) {
+  localStorage.setItem(LS_EXPOSED, JSON.stringify(map));
+}
+
+/* =======================
    Export / Import
 ======================= */
 function getAllData() {
   return {
-    schema: "fluencyflow.v1",
+    schema: "fluencyflow.v3",
     exportedAt: new Date().toISOString(),
     data: {
       vocabProgress: JSON.parse(localStorage.getItem(LS_PROGRESS) || "{}"),
       vocabProgressDaily: JSON.parse(localStorage.getItem(LS_DAILY) || "{}"),
       vocabHighest: JSON.parse(localStorage.getItem(LS_HIGHEST) || "{}"),
       vocabFavorites: JSON.parse(localStorage.getItem(LS_FAVORITES) || "{}"),
+      vocabExposed: JSON.parse(localStorage.getItem(LS_EXPOSED) || "{}"),
+      flowmanHighest: JSON.parse(localStorage.getItem(LS_FLOWMAN) || "{}"),
       dailyOffset: parseInt(localStorage.getItem(LS_OFFSET) || "0", 10),
     },
   };
@@ -215,7 +272,7 @@ function exportData() {
 
 function mergeMapsPreferHigherRank(base, incoming) {
   const res = { ...base };
-  for (const [k, v] of Object.entries(incoming)) {
+  for (const [k, v] of Object.entries(incoming || {})) {
     const cur = base[k];
     res[k] = (RANK[v] || 0) > (RANK[cur] || 0) ? v : cur ?? v;
   }
@@ -224,24 +281,56 @@ function mergeMapsPreferHigherRank(base, incoming) {
 
 function mergeDailyLog(base, incoming) {
   const res = { ...base };
-  for (const [date, val] of Object.entries(incoming)) {
+  for (const [date, val] of Object.entries(incoming || {})) {
     res[date] = (res[date] || 0) + (parseInt(val, 10) || 0);
   }
   return res;
 }
 
+function mergeExposed(base, incoming) {
+  const res = { ...base };
+  for (const [k, v] of Object.entries(incoming || {})) {
+    // keep earliest exposed date if both exist
+    if (!res[k]) res[k] = v;
+    else {
+      const a = new Date(res[k]).getTime();
+      const b = new Date(v).getTime();
+      if (!Number.isNaN(b) && (Number.isNaN(a) || b < a)) res[k] = v;
+    }
+  }
+  return res;
+}
+
+function mergeFlowman(base, incoming) {
+  const res = { ...base };
+  for (const [k, v] of Object.entries(incoming || {})) {
+    const cur = base[k] || "none";
+    const next = v || "none";
+    res[k] = (FLOW_RANK[next] || 0) > (FLOW_RANK[cur] || 0) ? next : cur;
+  }
+  return res;
+}
+
 function importDataFromObject(obj) {
-  if (!obj || obj.schema !== "fluencyflow.v1") {
+  // Accept v1, v2, v3
+  const schema = obj?.schema;
+  const isV1 = schema === "fluencyflow.v1";
+  const isV2 = schema === "fluencyflow.v2";
+  const isV3 = schema === "fluencyflow.v3";
+
+  if (!isV1 && !isV2 && !isV3) {
     alert("Invalid import file.");
     return;
   }
-  const {
-    vocabProgress,
-    vocabProgressDaily,
-    vocabHighest,
-    vocabFavorites,
-    dailyOffset,
-  } = obj.data;
+
+  const data = obj.data || {};
+  const vocabProgress = data.vocabProgress || {};
+  const vocabProgressDaily = data.vocabProgressDaily || {};
+  const vocabHighest = data.vocabHighest || {};
+  const vocabFavorites = data.vocabFavorites || {};
+  const vocabExposed = data.vocabExposed || {}; // absent in v1 ok
+  const flowmanHighest = data.flowmanHighest || {}; // absent in v1/v2 ok
+  const dailyOffset = data.dailyOffset;
 
   const merge = confirm(
     "Import data: OK to MERGE (keep progress) or Cancel to REPLACE?"
@@ -252,40 +341,57 @@ function importDataFromObject(obj) {
     const curDaily = JSON.parse(localStorage.getItem(LS_DAILY) || "{}");
     const curHigh = JSON.parse(localStorage.getItem(LS_HIGHEST) || "{}");
     const curFavs = JSON.parse(localStorage.getItem(LS_FAVORITES) || "{}");
+    const curExposed = JSON.parse(localStorage.getItem(LS_EXPOSED) || "{}");
+    const curFlow = JSON.parse(localStorage.getItem(LS_FLOWMAN) || "{}");
 
     localStorage.setItem(
       LS_PROGRESS,
-      JSON.stringify(mergeMapsPreferHigherRank(curProg, vocabProgress || {}))
+      JSON.stringify(mergeMapsPreferHigherRank(curProg, vocabProgress))
     );
     localStorage.setItem(
       LS_DAILY,
-      JSON.stringify(mergeDailyLog(curDaily, vocabProgressDaily || {}))
+      JSON.stringify(mergeDailyLog(curDaily, vocabProgressDaily))
     );
     localStorage.setItem(
       LS_HIGHEST,
-      JSON.stringify(mergeMapsPreferHigherRank(curHigh, vocabHighest || {}))
+      JSON.stringify(mergeMapsPreferHigherRank(curHigh, vocabHighest))
     );
     localStorage.setItem(
       LS_FAVORITES,
-      JSON.stringify({ ...curFavs, ...(vocabFavorites || {}) })
+      JSON.stringify({ ...curFavs, ...vocabFavorites })
+    );
+    localStorage.setItem(
+      LS_EXPOSED,
+      JSON.stringify(mergeExposed(curExposed, vocabExposed))
+    );
+    localStorage.setItem(
+      LS_FLOWMAN,
+      JSON.stringify(mergeFlowman(curFlow, flowmanHighest))
     );
   } else {
-    localStorage.setItem(LS_PROGRESS, JSON.stringify(vocabProgress || {}));
+    localStorage.setItem(LS_PROGRESS, JSON.stringify(vocabProgress));
     localStorage.setItem(LS_DAILY, JSON.stringify(vocabProgressDaily || "{}"));
-    localStorage.setItem(LS_HIGHEST, JSON.stringify(vocabHighest || {}));
-    localStorage.setItem(LS_FAVORITES, JSON.stringify(vocabFavorites || {}));
+    localStorage.setItem(LS_HIGHEST, JSON.stringify(vocabHighest));
+    localStorage.setItem(LS_FAVORITES, JSON.stringify(vocabFavorites));
+    localStorage.setItem(LS_EXPOSED, JSON.stringify(vocabExposed));
+    localStorage.setItem(LS_FLOWMAN, JSON.stringify(flowmanHighest));
   }
 
   if (typeof dailyOffset === "number") {
     localStorage.setItem(LS_OFFSET, String(dailyOffset));
   }
 
+  // Re-apply to in-memory words
   const progress = JSON.parse(localStorage.getItem(LS_PROGRESS) || "{}");
   const favs = JSON.parse(localStorage.getItem(LS_FAVORITES) || "{}");
+  const exposed = JSON.parse(localStorage.getItem(LS_EXPOSED) || "{}");
+  const flow = JSON.parse(localStorage.getItem(LS_FLOWMAN) || "{}");
 
   words.forEach((w) => {
     if (progress[w.key]) w.familiarity = progress[w.key];
     w.isFavorite = !!favs[w.key];
+    w.exposedAt = exposed[w.key] || null;
+    w.flowmanHighest = flow[w.key] || "none";
   });
 
   ensureTodayBucket();
@@ -302,7 +408,6 @@ function importDataFromObject(obj) {
 function kanaToRomaji(input) {
   if (!input) return "";
 
-  // Normalize to hiragana for simpler mapping (katakana -> hiragana)
   const toHiragana = (str) =>
     str.replace(/[\u30a1-\u30f6]/g, (c) =>
       String.fromCharCode(c.charCodeAt(0) - 0x60)
@@ -310,7 +415,6 @@ function kanaToRomaji(input) {
 
   let s = toHiragana(input);
 
-  // Youon digraphs (small ya/yu/yo)
   const digraphs = {
     きゃ: "kya",
     きゅ: "kyu",
@@ -427,16 +531,14 @@ function kanaToRomaji(input) {
     ぅ: "u",
     ぇ: "e",
     ぉ: "o",
-    ー: "-", // long mark (handled later)
+    ー: "-", // long mark
   };
 
-  // Build romaji greedily (digraphs first)
   let out = "";
   for (let i = 0; i < s.length; i++) {
     const c = s[i];
     const pair = s.slice(i, i + 2);
 
-    // sokuon (small tsu) doubles next consonant (except vowels/n)
     if (c === "っ") {
       const nextPair = s.slice(i + 1, i + 3);
       const nextChar = s[i + 1];
@@ -445,36 +547,30 @@ function kanaToRomaji(input) {
       else if (base[nextChar]) rom = base[nextChar];
       const first = rom ? rom[0] : "";
       if (first && /[bcdfghjklmnpqrstvwxyz]/.test(first)) out += first;
-      continue; // don't advance i yet; next loop will consume
+      continue;
     }
 
-    // digraph
     if (digraphs[pair]) {
       out += digraphs[pair];
       i++;
       continue;
     }
 
-    // long mark: repeat last vowel
     if (c === "ー") {
       const m = out.match(/[aiueo]$/);
       if (m) out += m[0];
       continue;
     }
 
-    // base mapping
     if (base[c]) {
       out += base[c];
       continue;
     }
 
-    // punctuation/others
     out += c;
   }
 
-  // ん before b/m/p → m (Hepburn)
   out = out.replace(/n(?=[bmp])/g, "m");
-
   return out;
 }
 
@@ -483,8 +579,11 @@ async function loadCSV() {
   let text = await res.text();
   text = text.replace(/^\uFEFF/, "");
   const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+
   const saved = JSON.parse(localStorage.getItem(LS_PROGRESS) || "{}");
   const favs = JSON.parse(localStorage.getItem(LS_FAVORITES) || "{}");
+  const exposed = JSON.parse(localStorage.getItem(LS_EXPOSED) || "{}");
+  const flow = JSON.parse(localStorage.getItem(LS_FLOWMAN) || "{}");
 
   words = parsed.data.map((r) => {
     const original = r["Original"]?.trim() || "";
@@ -505,8 +604,11 @@ async function loadCSV() {
       romaji,
       familiarity: saved[key] || "unknown",
       isFavorite: !!favs[key],
+      exposedAt: exposed[key] || null,
+      flowmanHighest: flow[key] || "none",
     };
   });
+
   console.log(`✅ Loaded ${words.length} words`);
 }
 
@@ -548,13 +650,46 @@ function createCard(word) {
   const header = document.createElement("div");
   header.className = "word-header";
 
+  const titleWrap = document.createElement("div");
+  titleWrap.style.display = "flex";
+  titleWrap.style.alignItems = "center";
+  titleWrap.style.gap = "10px";
+  titleWrap.style.flexWrap = "wrap";
+
   const titleSpan = document.createElement("span");
-  titleSpan.className = "kanji-main"; // 🔥 Kanji gets its own class
+  titleSpan.className = "kanji-main";
   titleSpan.textContent = word.original;
 
   const jlptSpan = document.createElement("span");
   jlptSpan.className = "jlpt";
   jlptSpan.textContent = word.jlpt;
+
+  // ✅ Flowman completion badge (colored circle)
+  const flow = document.createElement("span");
+  flow.style.width = "12px";
+  flow.style.height = "12px";
+  flow.style.borderRadius = "999px";
+  flow.style.display = "inline-block";
+  flow.style.flex = "0 0 auto";
+  flow.style.border = "1px solid rgba(255,255,255,0.35)";
+  flow.style.boxShadow = "0 0 0 2px rgba(0,0,0,0.18)";
+  flow.style.transform = "translateY(1px)";
+
+  const level = word.flowmanHighest || "none";
+  if (level === "easy") {
+    flow.style.background = "#3b82f6"; // blue
+    flow.title = "Completed Flowman on level easy";
+  } else if (level === "normal") {
+    flow.style.background = "#22c55e"; // green
+    flow.title = "Completed Flowman on level normal";
+  } else if (level === "hard") {
+    flow.style.background =
+      "conic-gradient(#ff3b3b, #ffd93b, #3bff7a, #3ba7ff, #b33bff, #ff3b3b)";
+    flow.title = "Completed Flowman on level hard";
+  } else {
+    flow.style.background = "rgba(255,255,255,0.28)"; // grey
+    flow.title = "Not completed in Flowman yet";
+  }
 
   const favBtn = document.createElement("button");
   favBtn.className = "fav-btn";
@@ -566,7 +701,8 @@ function createCard(word) {
     toggleFavorite(word.key);
   });
 
-  header.append(titleSpan, jlptSpan, favBtn);
+  titleWrap.append(titleSpan, jlptSpan, flow);
+  header.append(titleWrap, favBtn);
 
   const furigana = document.createElement("div");
   furigana.className = "furigana";
@@ -617,11 +753,8 @@ function toggleFavorite(key) {
   const favs = getFavoritesMap();
   word.isFavorite = !word.isFavorite;
 
-  if (word.isFavorite) {
-    favs[key] = true;
-  } else {
-    delete favs[key];
-  }
+  if (word.isFavorite) favs[key] = true;
+  else delete favs[key];
 
   saveFavoritesMap(favs);
   render();
@@ -633,14 +766,17 @@ function toggleFavorite(key) {
 function setFamiliarity(key, newLevel) {
   const word = words.find((w) => w.key === key);
   if (!word) return;
+
   const newRank = RANK[newLevel];
   const highMap = JSON.parse(localStorage.getItem(LS_HIGHEST) || "{}");
   const prevHigh = RANK[highMap[key]] || 0;
+
   if (newRank > prevHigh) {
     addDailyProgress(newRank - prevHigh);
     highMap[key] = newLevel;
     localStorage.setItem(LS_HIGHEST, JSON.stringify(highMap));
   }
+
   word.familiarity = newLevel;
   saveProgress();
   render();
@@ -662,10 +798,9 @@ function changePage(dir) {
   currentPage = Math.max(1, currentPage + dir);
   render();
 
-  // After the new page renders + layout settles, jump to the bottom
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      scrollToBottom("auto"); // change to "smooth" if you want animation
+      scrollToBottom("auto");
     });
   });
 }
@@ -689,6 +824,7 @@ function buildDailySeries(windowDays = 60) {
 }
 
 let dailyOffset = parseInt(localStorage.getItem(LS_OFFSET) || "0", 10);
+
 function renderDailyGraph(series) {
   const wrap = document.getElementById("dailyGraph");
   if (!wrap) return;
@@ -833,7 +969,6 @@ function updateStats() {
   const series = buildDailySeries(60);
   const grandTotal = Object.values(getDailyLog()).reduce((s, v) => s + v, 0);
 
-  // Total card
   let html = `
     <div class="stats-card">
       <h2>Total Progress</h2>
@@ -863,7 +998,6 @@ function updateStats() {
     </div>
   `;
 
-  // Per-level cards with legend
   ["N1", "N2", "N3", "N4", "N5"].forEach((lvl) => {
     const g = groups[lvl];
     if (!g) return;
@@ -901,7 +1035,6 @@ function updateStats() {
     `;
   });
 
-  // Daily graph + motivation
   html += `
     <div class="stats-card">
       <h3>Daily Progress (last 60 days)</h3>
@@ -916,17 +1049,23 @@ function updateStats() {
 
 function resetProgress() {
   if (
-    confirm("Reset ALL progress, stats, and points? This cannot be undone.")
+    confirm(
+      "Reset ALL progress, stats, points, favorites, exposed, and Flowman completion? This cannot be undone."
+    )
   ) {
     localStorage.removeItem(LS_PROGRESS);
     localStorage.removeItem(LS_DAILY);
     localStorage.removeItem(LS_HIGHEST);
     localStorage.removeItem(LS_OFFSET);
     localStorage.removeItem(LS_FAVORITES);
+    localStorage.removeItem(LS_EXPOSED);
+    localStorage.removeItem(LS_FLOWMAN);
 
     words.forEach((w) => {
       w.familiarity = "unknown";
       w.isFavorite = false;
+      w.exposedAt = null;
+      w.flowmanHighest = "none";
     });
 
     ensureTodayBucket();

@@ -9,7 +9,50 @@
 
   <body>
     <header>
-      <h1>JLPT Vocabulary Tracker</h1>
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          flex-wrap: wrap;
+        "
+      >
+        <div>
+          <h1 style="margin-bottom: 4px">JLPT Vocabulary Tracker</h1>
+          <div style="color: rgba(255, 255, 255, 0.75); font-weight: 700">
+            Library Mode •
+            <a
+              id="openGameTop"
+              href="hang.html"
+              style="color: inherit; text-decoration: underline"
+              >Switch to Game Mode</a
+            >
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; flex-wrap: wrap">
+          <a
+            id="openGameBtn"
+            href="hang.html"
+            style="
+              display: inline-flex;
+              align-items: center;
+              gap: 8px;
+              padding: 10px 12px;
+              border-radius: 12px;
+              border: 1px solid rgba(255, 255, 255, 0.18);
+              background: rgba(0, 0, 0, 0.18);
+              color: white;
+              font-weight: 900;
+              text-decoration: none;
+            "
+            title="Open Flowman / Hangman mode"
+          >
+            🎮 Game Mode
+          </a>
+        </div>
+      </div>
 
       <div class="controls">
         <!-- JLPT filter -->

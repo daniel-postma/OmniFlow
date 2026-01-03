@@ -1,0 +1,2055 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JLPT Hangman</title>
+    <style>
+      :root {
+        --bg: #0b0f17;
+        --text: #e7eefc;
+        --muted: #a9b7d6;
+        --accent: #7aa2ff;
+        --danger: #ff6b6b;
+        --ok: #4fe3a5;
+        --radius: 16px;
+        --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
+          Helvetica, Arial;
+        background: radial-gradient(
+            1200px 600px at 20% 10%,
+            rgba(122, 162, 255, 0.18),
+            transparent 60%
+          ),
+          radial-gradient(
+            1000px 500px at 90% 20%,
+            rgba(79, 227, 165, 0.14),
+            transparent 55%
+          ),
+          var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+      }
+      .app {
+        width: min(1100px, 100%);
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 16px;
+      }
+      @media (max-width: 900px) {
+        .app {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .card {
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.03),
+          rgba(255, 255, 255, 0.01)
+        );
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+      .cardHeader {
+        padding: 14px 16px;
+        background: rgba(255, 255, 255, 0.03);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .title {
+        font-weight: 900;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .content {
+        padding: 16px;
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        appearance: none;
+        cursor: pointer;
+        user-select: none;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: rgba(0, 0, 0, 0.18);
+        color: var(--text);
+        padding: 10px 12px;
+        border-radius: 12px;
+        font-weight: 800;
+        transition: transform 0.05s ease, border-color 0.15s ease,
+          background 0.15s ease;
+      }
+      .btn:hover {
+        border-color: rgba(122, 162, 255, 0.6);
+        background: rgba(122, 162, 255, 0.1);
+      }
+      .btn:active {
+        transform: translateY(1px);
+      }
+      .btn.ok {
+        border-color: rgba(79, 227, 165, 0.6);
+        background: rgba(79, 227, 165, 0.1);
+      }
+      .btn.danger {
+        border-color: rgba(255, 107, 107, 0.7);
+        background: rgba(255, 107, 107, 0.1);
+      }
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      select,
+      input[type="text"] {
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: rgba(0, 0, 0, 0.2);
+        color: var(--text);
+        outline: none;
+        font-weight: 700;
+      }
+      .labelTiny {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(0, 0, 0, 0.14);
+      }
+      .toggle input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        accent-color: var(--accent);
+      }
+
+      .bigKanji {
+        font-size: 56px;
+        font-weight: 950;
+        line-height: 1.05;
+        margin: 6px 0 6px;
+        word-break: break-word;
+      }
+      .meaning {
+        margin: 0 0 10px;
+        color: var(--muted);
+        font-size: 18px;
+      }
+      .meaning.hard {
+        color: var(--text);
+        font-size: 30px;
+        font-weight: 950;
+        line-height: 1.2;
+        margin-top: 8px;
+      }
+      .subline {
+        color: var(--muted);
+        font-size: 13px;
+        margin: 0 0 14px;
+      }
+
+      .blanks {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: flex-end;
+        margin: 12px 0 16px;
+        min-height: 56px;
+      }
+      .slot {
+        width: 34px;
+        height: 46px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.18);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        font-size: 22px;
+        font-weight: 950;
+        text-transform: lowercase;
+      }
+      .slot.revealed {
+        border-color: rgba(79, 227, 165, 0.55);
+        background: rgba(79, 227, 165, 0.08);
+      }
+
+      .guessBar {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .kbdHint {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 10px;
+      }
+      .kbdWrap {
+        margin-top: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .kbdRow {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        flex-wrap: nowrap;
+      }
+      .key {
+        padding: 10px 0;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(0, 0, 0, 0.16);
+        color: var(--text);
+        font-weight: 950;
+        cursor: pointer;
+        text-transform: lowercase;
+        user-select: none;
+        min-width: 34px;
+        flex: 1 1 0px;
+      }
+      .key:hover {
+        border-color: rgba(122, 162, 255, 0.55);
+        background: rgba(122, 162, 255, 0.1);
+      }
+      .key.used {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+      .key.good {
+        border-color: rgba(79, 227, 165, 0.55);
+        background: rgba(79, 227, 165, 0.08);
+      }
+      .key.bad {
+        border-color: rgba(255, 107, 107, 0.6);
+        background: rgba(255, 107, 107, 0.1);
+      }
+      .key.wide {
+        flex: 2 1 0px;
+      }
+      .key.kana {
+        text-transform: none;
+        font-weight: 900;
+      }
+
+      .kbdWrap.kanaDock {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      @media (max-width: 900px) {
+        .kbdWrap.kanaDock {
+          grid-template-columns: 1fr;
+        }
+      }
+      .kbdCol {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .kbdControls {
+        grid-column: 1 / -1;
+        display: flex;
+        justify-content: center;
+      }
+
+      .mcqArea {
+        margin-top: 14px;
+        display: none;
+      }
+      .mcqGrid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 10px;
+      }
+      @media (max-width: 700px) {
+        .mcqGrid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      .mcqBtn {
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(0, 0, 0, 0.18);
+        color: var(--text);
+        padding: 12px 10px;
+        font-weight: 950;
+        cursor: pointer;
+        user-select: none;
+        text-align: center;
+      }
+      .mcqBtn:hover {
+        border-color: rgba(122, 162, 255, 0.55);
+        background: rgba(122, 162, 255, 0.1);
+      }
+      .mcqBtn.bad {
+        border-color: rgba(255, 107, 107, 0.7);
+        background: rgba(255, 107, 107, 0.1);
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+      .mcqBtn.good {
+        border-color: rgba(79, 227, 165, 0.6);
+        background: rgba(79, 227, 165, 0.1);
+      }
+
+      .rightPanel {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .artWrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.18);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 12px;
+        min-height: 280px;
+        position: relative;
+        overflow: hidden;
+      }
+      canvas {
+        width: 240px;
+        height: 240px;
+        image-rendering: pixelated;
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .artFallback {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 18px;
+        color: var(--muted);
+        font-weight: 900;
+        line-height: 1.4;
+      }
+
+      .statGrid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      @media (max-width: 700px) {
+        .statGrid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      .stat {
+        background: rgba(0, 0, 0, 0.14);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        padding: 10px 12px;
+      }
+      .stat .label {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 2px;
+      }
+      .stat .value {
+        font-size: 20px;
+        font-weight: 950;
+      }
+
+      .toast {
+        margin-top: 12px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(0, 0, 0, 0.18);
+        color: var(--muted);
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.25);
+      }
+      .dot.ok {
+        background: rgba(79, 227, 165, 0.7);
+      }
+      .dot.bad {
+        background: rgba(255, 107, 107, 0.8);
+      }
+
+      .keyboardDock {
+        grid-column: 1 / -1;
+      }
+      .keyboardDock .content {
+        padding: 14px 16px;
+      }
+      .keyboardDock .kbdHint {
+        margin-top: 0;
+      }
+      .keyboardDock .kbdWrap {
+        margin-top: 10px;
+      }
+      .keyboardDock .key {
+        min-width: 44px;
+        padding: 12px 0;
+        font-size: 18px;
+      }
+      .keyboardDock .kbdRow {
+        gap: 10px;
+      }
+
+      .miniLink {
+        text-decoration: none;
+        color: var(--text);
+        font-weight: 900;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: rgba(0, 0, 0, 0.18);
+        padding: 10px 12px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .miniLink:hover {
+        border-color: rgba(122, 162, 255, 0.6);
+        background: rgba(122, 162, 255, 0.1);
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="app">
+      <!-- LEFT: GAME -->
+      <section class="card">
+        <div class="cardHeader">
+          <div class="title">JLPT Hangman</div>
+
+          <div class="row">
+            <a class="miniLink" href="index.html" title="Back to FluencyFlow">
+              ⬅ Tracker
+            </a>
+
+            <span class="labelTiny">Mode:</span>
+            <select id="modeSelect" aria-label="Mode">
+              <option value="easy">Easy</option>
+              <option value="normal" selected>Normal</option>
+              <option value="hard">Hard</option>
+            </select>
+
+            <span class="labelTiny">Play From:</span>
+            <select id="playFromSelect" aria-label="Play from familiarity">
+              <option value="all" selected>All (This Level)</option>
+              <option value="unknown">Unknown</option>
+              <option value="explored">Explored</option>
+              <option value="known">Known</option>
+              <option value="well_known">Well Known</option>
+            </select>
+
+            <span class="labelTiny" style="margin-left: 8px">Level:</span>
+            <select id="levelSelect" aria-label="Level"></select>
+            <button class="btn" id="btnPrevLevel">◀</button>
+            <button class="btn" id="btnNextLevel">▶</button>
+          </div>
+
+          <!-- hidden debug only -->
+          <span id="statusPill" style="display: none">Loading…</span>
+        </div>
+
+        <div class="content">
+          <div class="row" style="margin-bottom: 12px">
+            <button class="btn ok" id="btnStart" disabled>Start</button>
+            <button class="btn danger" id="btnResetRun" disabled>
+              Reset Run
+            </button>
+
+            <label class="toggle" title="Easy mode only">
+              <input id="toggleFurigana" type="checkbox" checked />
+              <span class="labelTiny">Show Furigana (Easy)</span>
+            </label>
+
+            <span id="hardAnswerWrap" class="toggle" style="display: none">
+              <span class="labelTiny">Hard Answers</span>
+              <select id="hardAnswerSelect" aria-label="Hard answers">
+                <option value="reading">Reading (かな)</option>
+                <option value="kanji">Kanji</option>
+              </select>
+            </span>
+          </div>
+
+          <div id="gameArea">
+            <div class="bigKanji" id="kanjiText">—</div>
+            <p class="meaning" id="meaningText">—</p>
+            <p class="subline" id="furiganaLine" style="display: none">
+              Furigana: —
+            </p>
+
+            <div class="blanks" id="blanks"></div>
+
+            <div class="guessBar" id="guessBar">
+              <input
+                id="fullGuess"
+                type="text"
+                placeholder="Type kana/romaji to guess the full reading…"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button class="btn ok" id="btnSubmit">Submit</button>
+              <button class="btn" id="btnHint">Hint</button>
+              <button class="btn danger" id="btnSkip">Skip</button>
+            </div>
+
+            <div id="keyboardHome">
+              <div class="kbdHint" id="kbdHint">Click letters (QWERTY).</div>
+              <div class="kbdWrap" id="keyboard"></div>
+            </div>
+
+            <div class="mcqArea" id="mcqArea">
+              <div class="kbdHint" id="mcqHint">
+                Pick the correct answer (same level).
+              </div>
+              <div class="mcqGrid" id="mcqGrid"></div>
+            </div>
+
+            <div class="toast" id="toast">
+              <span class="dot"></span>
+              <span id="toastText">Loading jlpt_vocab.csv…</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT: STATS + ANIMATION + MUTE -->
+      <aside class="rightPanel">
+        <section class="card">
+          <div class="cardHeader" style="justify-content: flex-end">
+            <label class="toggle">
+              <input id="muteMusic" type="checkbox" />
+              <span class="labelTiny">Mute Music</span>
+            </label>
+          </div>
+
+          <div class="content">
+            <div class="statGrid">
+              <div class="stat">
+                <div class="label">Lives</div>
+                <div class="value" id="statLives">0</div>
+              </div>
+              <div class="stat">
+                <div class="label">Streak</div>
+                <div class="value" id="statStreak">0</div>
+              </div>
+              <div class="stat">
+                <div class="label">Solved (Level)</div>
+                <div class="value" id="statSolvedLevel">0/100</div>
+              </div>
+            </div>
+
+            <div class="artWrap">
+              <canvas
+                id="spriteCanvas"
+                width="240"
+                height="240"
+                aria-label="sleep_kev animation"
+              ></canvas>
+              <div class="artFallback" id="artFallback" style="display: none">
+                Put <b>sleep_kev.png</b> in the same folder.<br /><br />
+                Expected: 7 frames, each 120×120,<br />
+                laid out 3 across, then wraps down.
+              </div>
+            </div>
+
+            <div style="display: none">
+              Sprite: sleep_kev.png / CSV: jlpt_vocab.csv / Music:
+              assets/music/bgm.mp3
+            </div>
+          </div>
+        </section>
+
+        <audio id="bgm" src="assets/music/bgm.mp3" loop preload="auto"></audio>
+      </aside>
+
+      <!-- FULL-WIDTH KEYBOARD DOCK (Normal mode only) -->
+      <section
+        class="card keyboardDock"
+        id="keyboardDock"
+        style="display: none"
+      >
+        <div class="content" id="keyboardDockContent"></div>
+      </section>
+    </div>
+
+    <script>
+      // ========= DOM =========
+      const modeSelect = document.getElementById("modeSelect");
+      const playFromSelect = document.getElementById("playFromSelect");
+      const levelSelect = document.getElementById("levelSelect");
+      const btnPrevLevel = document.getElementById("btnPrevLevel");
+      const btnNextLevel = document.getElementById("btnNextLevel");
+      const btnStart = document.getElementById("btnStart");
+      const btnResetRun = document.getElementById("btnResetRun");
+
+      const toggleFurigana = document.getElementById("toggleFurigana");
+      const hardAnswerWrap = document.getElementById("hardAnswerWrap");
+      const hardAnswerSelect = document.getElementById("hardAnswerSelect");
+
+      const kanjiText = document.getElementById("kanjiText");
+      const meaningText = document.getElementById("meaningText");
+      const furiganaLine = document.getElementById("furiganaLine");
+      const blanksEl = document.getElementById("blanks");
+
+      const fullGuess = document.getElementById("fullGuess");
+      const btnSubmit = document.getElementById("btnSubmit");
+      const btnHint = document.getElementById("btnHint");
+      const btnSkip = document.getElementById("btnSkip");
+
+      const kbdHint = document.getElementById("kbdHint");
+      const keyboardEl = document.getElementById("keyboard");
+
+      const mcqArea = document.getElementById("mcqArea");
+      const mcqGrid = document.getElementById("mcqGrid");
+      const mcqHint = document.getElementById("mcqHint");
+
+      const toastDot = document.querySelector("#toast .dot");
+      const toastText = document.getElementById("toastText");
+
+      const statLives = document.getElementById("statLives");
+      const statStreak = document.getElementById("statStreak");
+      const statSolvedLevel = document.getElementById("statSolvedLevel");
+
+      const muteMusic = document.getElementById("muteMusic");
+      const bgm = document.getElementById("bgm");
+
+      const spriteCanvas = document.getElementById("spriteCanvas");
+      const ctx = spriteCanvas.getContext("2d");
+      const artFallback = document.getElementById("artFallback");
+
+      const keyboardHome = document.getElementById("keyboardHome");
+      const keyboardDock = document.getElementById("keyboardDock");
+      const keyboardDockContent = document.getElementById(
+        "keyboardDockContent"
+      );
+
+      const statusPill = document.getElementById("statusPill");
+
+      // ========= CONFIG =========
+      const WORDS_PER_LEVEL = 100;
+
+      const MAX_WRONG_EASY = 6;
+      const MAX_WRONG_NORMAL = 13;
+      const MAX_WRONG_HARD = 6;
+
+      const SPRITE_FILE = "sleep_kev.png";
+      const SPRITE_FRAMES = 7;
+      const SPRITE_FRAME_W = 120;
+      const SPRITE_FRAME_H = 120;
+      const SPRITE_COLS = 3;
+
+      const QWERTY_ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
+
+      const HIRA_ROWS = [
+        "あいうえお",
+        "かきくけこ",
+        "さしすせそ",
+        "たちつてと",
+        "なにぬねの",
+        "はひふへほ",
+        "まみむめも",
+        "やゆよ",
+        "らりるれろ",
+        "わをん",
+        "がぎぐげご",
+        "ざじずぜぞ",
+        "だぢづでど",
+        "ばびぶべぼ",
+        "ぱぴぷぺぽ",
+        "ゃゅょっー",
+        "ぁぃぅぇぉ",
+      ];
+
+      // ========= FluencyFlow SYNC (LOCALSTORAGE) =========
+      const FF_LS_PROGRESS = "vocabProgress";
+      const FF_LS_DAILY = "vocabProgressDaily";
+      const FF_LS_HIGHEST = "vocabHighest";
+      const FF_LS_EXPOSED = "vocabExposed"; // NEW: tracks exposure timestamps
+      const FF_RANK = { unknown: 0, explored: 1, known: 2, well_known: 3 };
+
+      // ========= Flowman completion sync (LOCALSTORAGE) =========
+      // Tracker shows colored circle based on this map:
+      // { [wordKey]: "easy" | "normal" | "hard" }
+      const LS_FLOWMAN = "flowmanHighest";
+      const FLOW_RANK = { none: 0, easy: 1, normal: 2, hard: 3 };
+
+      function ffTodayKey() {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+          2,
+          "0"
+        )}-${String(d.getDate()).padStart(2, "0")}`;
+      }
+
+      function ffReadJSON(key, fallback) {
+        try {
+          return JSON.parse(localStorage.getItem(key) || fallback);
+        } catch {
+          return JSON.parse(fallback);
+        }
+      }
+      function ffWriteJSON(key, obj) {
+        localStorage.setItem(key, JSON.stringify(obj));
+      }
+
+      // Must match tracker: `${original}|${furigana}|${english}`
+      function ffMakeKeyFromWord(w) {
+        const original = (w?.kanji || "").trim();
+        const furigana = (w?.furigana || "").trim();
+        const english = (w?.meaning || "").trim();
+        return `${original}|${furigana}|${english}`;
+      }
+
+      function ffGetFamiliarityForWord(w) {
+        const key = ffMakeKeyFromWord(w);
+        if (!key || key === "||") return "unknown";
+        const progress = ffReadJSON(FF_LS_PROGRESS, "{}");
+        return progress[key] || "unknown";
+      }
+
+      // Record that the user SAW this word in Flowman (once; keep earliest)
+      function ffRecordExposure(wordObj) {
+        const key = ffMakeKeyFromWord(wordObj);
+        if (!key || key === "||") return;
+        const exposed = ffReadJSON(FF_LS_EXPOSED, "{}");
+        if (!exposed[key]) {
+          exposed[key] = new Date().toISOString();
+          ffWriteJSON(FF_LS_EXPOSED, exposed);
+        }
+      }
+
+      // Save "completed on easy/normal/hard" highest mode
+      function flowReadJSON(key, fallback) {
+        try {
+          return JSON.parse(localStorage.getItem(key) || fallback);
+        } catch {
+          return JSON.parse(fallback);
+        }
+      }
+      function flowWriteJSON(key, obj) {
+        localStorage.setItem(key, JSON.stringify(obj));
+      }
+
+      function recordFlowmanWin(wordObj, mode) {
+        const key = ffMakeKeyFromWord(wordObj);
+        if (!key || key === "||") return;
+
+        const map = flowReadJSON(LS_FLOWMAN, "{}");
+        const cur = map[key] || "none";
+        const next = mode || "easy";
+
+        map[key] = (FLOW_RANK[next] || 0) > (FLOW_RANK[cur] || 0) ? next : cur;
+
+        flowWriteJSON(LS_FLOWMAN, map);
+      }
+
+      function ffAwardProgressForWin(wordObj) {
+        const mode = getMode();
+        const newLevel =
+          mode === "hard"
+            ? "well_known"
+            : mode === "normal"
+            ? "known"
+            : "explored";
+
+        const key = ffMakeKeyFromWord(wordObj);
+        if (!key || key === "||") return;
+
+        const progress = ffReadJSON(FF_LS_PROGRESS, "{}");
+        const highest = ffReadJSON(FF_LS_HIGHEST, "{}");
+        const daily = ffReadJSON(FF_LS_DAILY, "{}");
+
+        const prevHigh = highest[key] || progress[key] || "unknown";
+        const prevRank = FF_RANK[prevHigh] || 0;
+        const newRank = FF_RANK[newLevel] || 0;
+
+        // Store best known state
+        const finalLevel = newRank > prevRank ? newLevel : prevHigh;
+        progress[key] = finalLevel;
+
+        // Award points only when beating highest
+        if (newRank > prevRank) {
+          highest[key] = newLevel;
+          const t = ffTodayKey();
+          daily[t] = (daily[t] || 0) + (newRank - prevRank);
+        }
+
+        ffWriteJSON(FF_LS_PROGRESS, progress);
+        ffWriteJSON(FF_LS_HIGHEST, highest);
+        ffWriteJSON(FF_LS_DAILY, daily);
+      }
+
+      // ========= STATE =========
+      let orderedWords = [];
+      let totalLevels = 1;
+
+      let levelSlice = [];
+      let levelWords = [];
+      let remaining = [];
+
+      let current = null;
+      let targetRomaji = "";
+      let targetKanaNorm = "";
+
+      let displayLetters = [];
+      let revealed = new Set();
+      let guessedLetters = new Set();
+      let wrong = 0;
+
+      let solved = 0;
+      let streak = 0;
+
+      let spriteImg = new Image();
+      let spriteReady = false;
+
+      // ========= Helpers =========
+      function getMode() {
+        return modeSelect.value;
+      }
+      function getPlayFrom() {
+        return playFromSelect.value;
+      }
+      function getHardAnswerMode() {
+        return hardAnswerSelect.value === "kanji" ? "kanji" : "reading";
+      }
+      function getMaxWrong() {
+        const mode = getMode();
+        if (mode === "normal") return MAX_WRONG_NORMAL;
+        if (mode === "hard") return MAX_WRONG_HARD;
+        return MAX_WRONG_EASY;
+      }
+
+      function setToast(type, msg) {
+        toastText.textContent = msg;
+        toastDot.classList.remove("ok", "bad");
+        toastDot.classList.add(type === "ok" ? "ok" : "bad");
+      }
+
+      function levelTargetCount() {
+        const bucket = getPlayFrom();
+        if (bucket !== "all") return Math.max(1, levelWords.length);
+        return Math.max(1, levelSlice.length || WORDS_PER_LEVEL);
+      }
+
+      function updateStats() {
+        const maxWrong = getMaxWrong();
+        statLives.textContent = String(Math.max(0, maxWrong - wrong));
+        statStreak.textContent = String(streak);
+        statSolvedLevel.textContent = `${solved}/${levelTargetCount()}`;
+      }
+
+      function beep(kind = "ok") {
+        try {
+          const ac = new (window.AudioContext || window.webkitAudioContext)();
+          const o = ac.createOscillator();
+          const g = ac.createGain();
+          o.type = "sine";
+          o.frequency.value = kind === "ok" ? 660 : 220;
+          g.gain.value = 0.07;
+          o.connect(g);
+          g.connect(ac.destination);
+          o.start();
+          o.stop(ac.currentTime + 0.08);
+          setTimeout(() => ac.close(), 150);
+        } catch (e) {}
+      }
+
+      function normalizeRomaji(s) {
+        return (s || "")
+          .toLowerCase()
+          .trim()
+          .replace(/[’']/g, "")
+          .replace(/[-\s_]/g, "")
+          .replace(/ā/g, "aa")
+          .replace(/ī/g, "ii")
+          .replace(/ū/g, "uu")
+          .replace(/ē/g, "ee")
+          .replace(/ō/g, "ou");
+      }
+
+      function normalizeKana(s) {
+        return (s || "")
+          .trim()
+          .replace(/\s+/g, "")
+          .replace(
+            /[()（）［］\[\]{}「」『』【】<>＜＞・,，.。！!？?／/\\]/g,
+            ""
+          );
+      }
+
+      function shuffle(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+      }
+
+      // ========= Music =========
+      function applyMuteState() {
+        bgm.volume = 0.35;
+        bgm.muted = !!muteMusic.checked;
+        if (bgm.muted) {
+          try {
+            bgm.pause();
+          } catch (e) {}
+        } else {
+          bgm.play().catch(() => {});
+        }
+      }
+      function ensureBgmRunning() {
+        if (!muteMusic.checked && bgm.paused) {
+          bgm.play().catch(() => {});
+        }
+      }
+
+      // ========= CSV parsing (quoted commas) =========
+      function parseCSV(text) {
+        const rows = [];
+        let row = [];
+        let cell = "";
+        let inQuotes = false;
+
+        for (let i = 0; i < text.length; i++) {
+          const ch = text[i];
+          const next = text[i + 1];
+
+          if (ch === '"') {
+            if (inQuotes && next === '"') {
+              cell += '"';
+              i++;
+            } else inQuotes = !inQuotes;
+          } else if (ch === "," && !inQuotes) {
+            row.push(cell);
+            cell = "";
+          } else if ((ch === "\n" || ch === "\r") && !inQuotes) {
+            if (ch === "\r" && next === "\n") i++;
+            row.push(cell);
+            if (row.join("").trim() !== "") rows.push(row);
+            row = [];
+            cell = "";
+          } else {
+            cell += ch;
+          }
+        }
+        row.push(cell);
+        if (row.join("").trim() !== "") rows.push(row);
+        return rows;
+      }
+
+      // ========= Kana -> Romaji (simple) =========
+      function kataToHira(s) {
+        return (s || "").replace(/[\u30a1-\u30f6]/g, (ch) =>
+          String.fromCharCode(ch.charCodeAt(0) - 0x60)
+        );
+      }
+
+      function kanaToRomaji(kanaRaw) {
+        let s = kataToHira((kanaRaw || "").trim()).replace(/\s+/g, "");
+
+        const digraph = {
+          きゃ: "kya",
+          きゅ: "kyu",
+          きょ: "kyo",
+          ぎゃ: "gya",
+          ぎゅ: "gyu",
+          ぎょ: "gyo",
+          しゃ: "sha",
+          しゅ: "shu",
+          しょ: "sho",
+          じゃ: "ja",
+          じゅ: "ju",
+          じょ: "jo",
+          ちゃ: "cha",
+          ちゅ: "chu",
+          ちょ: "cho",
+          にゃ: "nya",
+          にゅ: "nyu",
+          にょ: "nyo",
+          ひゃ: "hya",
+          ひゅ: "hyu",
+          ひょ: "hyo",
+          びゃ: "bya",
+          びゅ: "byu",
+          びょ: "byo",
+          ぴゃ: "pya",
+          ぴゅ: "pyu",
+          ぴょ: "pyo",
+          みゃ: "mya",
+          みゅ: "myu",
+          みょ: "myo",
+          りゃ: "rya",
+          りゅ: "ryu",
+          りょ: "ryo",
+        };
+        const mono = {
+          あ: "a",
+          い: "i",
+          う: "u",
+          え: "e",
+          お: "o",
+          か: "ka",
+          き: "ki",
+          く: "ku",
+          け: "ke",
+          こ: "ko",
+          さ: "sa",
+          し: "shi",
+          す: "su",
+          せ: "se",
+          そ: "so",
+          た: "ta",
+          ち: "chi",
+          つ: "tsu",
+          て: "te",
+          と: "to",
+          な: "na",
+          に: "ni",
+          ぬ: "nu",
+          ね: "ne",
+          の: "no",
+          は: "ha",
+          ひ: "hi",
+          ふ: "fu",
+          へ: "he",
+          ほ: "ho",
+          ま: "ma",
+          み: "mi",
+          む: "mu",
+          め: "me",
+          も: "mo",
+          や: "ya",
+          ゆ: "yu",
+          よ: "yo",
+          ら: "ra",
+          り: "ri",
+          る: "ru",
+          れ: "re",
+          ろ: "ro",
+          わ: "wa",
+          を: "o",
+          ん: "n",
+          が: "ga",
+          ぎ: "gi",
+          ぐ: "gu",
+          げ: "ge",
+          ご: "go",
+          ざ: "za",
+          じ: "ji",
+          ず: "zu",
+          ぜ: "ze",
+          ぞ: "zo",
+          だ: "da",
+          ぢ: "ji",
+          づ: "dzu",
+          で: "de",
+          ど: "do",
+          ば: "ba",
+          び: "bi",
+          ぶ: "bu",
+          べ: "be",
+          ぼ: "bo",
+          ぱ: "pa",
+          ぴ: "pi",
+          ぷ: "pu",
+          ぺ: "pe",
+          ぽ: "po",
+          ぁ: "a",
+          ぃ: "i",
+          ぅ: "u",
+          ぇ: "e",
+          ぉ: "o",
+          ゃ: "ya",
+          ゅ: "yu",
+          ょ: "yo",
+          ゔ: "vu",
+        };
+
+        let out = "";
+        let gem = false;
+
+        function lastVowel(str) {
+          for (let i = str.length - 1; i >= 0; i--) {
+            if ("aeiou".includes(str[i])) return str[i];
+          }
+          return "";
+        }
+
+        for (let i = 0; i < s.length; i++) {
+          const ch = s[i];
+          const next = s[i + 1] || "";
+          const pair = ch + next;
+
+          if (ch === "っ") {
+            gem = true;
+            continue;
+          }
+          if (ch === "ー") {
+            const v = lastVowel(out);
+            if (v) out += v;
+            continue;
+          }
+
+          let roma = "";
+          if (digraph[pair]) {
+            roma = digraph[pair];
+            i++;
+          } else if (mono[ch]) {
+            roma = mono[ch];
+          } else {
+            continue;
+          }
+
+          if (gem) {
+            const c0 = roma[0];
+            if (c0 && !"aeiou".includes(c0)) out += c0;
+            gem = false;
+          }
+          out += roma;
+        }
+        return out;
+      }
+
+      // ========= Sprite (3-wide grid) =========
+      function initSprite() {
+        spriteImg = new Image();
+        spriteImg.src = SPRITE_FILE;
+
+        spriteImg.onload = () => {
+          spriteReady = true;
+          artFallback.style.display = "none";
+          drawSpriteFrame(0);
+        };
+
+        spriteImg.onerror = () => {
+          spriteReady = false;
+          artFallback.style.display = "flex";
+          ctx.clearRect(0, 0, spriteCanvas.width, spriteCanvas.height);
+        };
+      }
+
+      function drawSpriteFrame(frameIndex) {
+        if (!spriteReady) return;
+
+        const fi = Math.max(0, Math.min(SPRITE_FRAMES - 1, frameIndex));
+        const col = fi % SPRITE_COLS;
+        const row = Math.floor(fi / SPRITE_COLS);
+
+        const sx = col * SPRITE_FRAME_W;
+        const sy = row * SPRITE_FRAME_H;
+
+        ctx.clearRect(0, 0, spriteCanvas.width, spriteCanvas.height);
+        ctx.imageSmoothingEnabled = false;
+
+        ctx.drawImage(
+          spriteImg,
+          sx,
+          sy,
+          SPRITE_FRAME_W,
+          SPRITE_FRAME_H,
+          0,
+          0,
+          spriteCanvas.width,
+          spriteCanvas.height
+        );
+      }
+
+      function setFrameByWrong() {
+        const maxWrong = getMaxWrong();
+        const denom = Math.max(1, maxWrong);
+        const ratio = Math.min(1, wrong / denom);
+        const frame = Math.floor(ratio * (SPRITE_FRAMES - 1));
+        drawSpriteFrame(Math.min(SPRITE_FRAMES - 1, Math.max(0, frame)));
+      }
+
+      // ========= Keyboard Docking =========
+      function placeKeyboard() {
+        if (getMode() === "normal") {
+          keyboardDock.style.display = "block";
+          keyboardDockContent.appendChild(kbdHint);
+          keyboardDockContent.appendChild(keyboardEl);
+        } else {
+          keyboardDock.style.display = "none";
+          keyboardHome.appendChild(kbdHint);
+          keyboardHome.appendChild(keyboardEl);
+        }
+      }
+
+      // ========= Keyboard builder =========
+      function clearKeyboard() {
+        keyboardEl.innerHTML = "";
+        keyboardEl.classList.remove("kanaDock");
+        keyboardEl.style.gridTemplateColumns = "";
+      }
+
+      function makeRow(chars, isKana) {
+        const row = document.createElement("div");
+        row.className = "kbdRow";
+        chars.forEach((ch) => {
+          const b = document.createElement("button");
+          b.className = "key" + (isKana ? " kana" : "");
+          b.textContent = ch;
+          if (isKana) {
+            b.addEventListener("click", () => onKanaGuess(ch));
+          } else {
+            b.addEventListener("click", () => onLetterGuess(ch));
+          }
+          row.appendChild(b);
+        });
+        return row;
+      }
+
+      function addControlRow() {
+        const row = document.createElement("div");
+        row.className = "kbdRow";
+
+        const back = document.createElement("button");
+        back.className = "key wide";
+        back.textContent = "⌫";
+        back.title = "Backspace";
+        back.addEventListener("click", () => {
+          fullGuess.value = fullGuess.value.slice(0, -1);
+          fullGuess.focus();
+        });
+
+        const clr = document.createElement("button");
+        clr.className = "key wide";
+        clr.textContent = "clr";
+        clr.title = "Clear";
+        clr.addEventListener("click", () => {
+          fullGuess.value = "";
+          fullGuess.focus();
+        });
+
+        row.appendChild(back);
+        row.appendChild(clr);
+        return row;
+      }
+
+      function buildKeyboardForMode() {
+        clearKeyboard();
+
+        const mode = getMode();
+
+        if (mode === "easy") {
+          keyboardEl.style.display = "flex";
+          QWERTY_ROWS.forEach((r) =>
+            keyboardEl.appendChild(makeRow(r.split(""), false))
+          );
+          keyboardEl.appendChild(addControlRow());
+          kbdHint.style.display = "block";
+          kbdHint.textContent =
+            "Click letters (QWERTY) to guess romaji letters.";
+          return;
+        }
+
+        if (mode === "normal") {
+          keyboardEl.classList.add("kanaDock");
+
+          const cols = window.matchMedia("(min-width: 900px)").matches ? 2 : 1;
+          keyboardEl.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+
+          const colEls = [];
+          for (let i = 0; i < cols; i++) {
+            const c = document.createElement("div");
+            c.className = "kbdCol";
+            colEls.push(c);
+            keyboardEl.appendChild(c);
+          }
+
+          const split = Math.ceil(HIRA_ROWS.length / cols);
+          HIRA_ROWS.forEach((r, i) => {
+            const colIndex = Math.min(cols - 1, Math.floor(i / split));
+            colEls[colIndex].appendChild(makeRow(r.split(""), true));
+          });
+
+          const controlsWrap = document.createElement("div");
+          controlsWrap.className = "kbdControls";
+          controlsWrap.appendChild(addControlRow());
+          keyboardEl.appendChild(controlsWrap);
+
+          kbdHint.style.display = "block";
+          kbdHint.textContent =
+            "Click hiragana to guess (fills blanks). Or type full reading (kana/romaji) and Submit.";
+          return;
+        }
+
+        kbdHint.style.display = "none";
+        keyboardEl.style.display = "none";
+      }
+
+      function resetKeyStates() {
+        keyboardEl.querySelectorAll(".key").forEach((k) => {
+          k.classList.remove("used", "good", "bad");
+          k.disabled = false;
+        });
+      }
+
+      function markKey(ch, status) {
+        const key = [...keyboardEl.querySelectorAll(".key")].find(
+          (k) => k.textContent === ch
+        );
+        if (!key) return;
+        key.classList.add("used");
+        if (status === "good") key.classList.add("good");
+        if (status === "bad") key.classList.add("bad");
+        key.disabled = true;
+      }
+
+      // ========= Level UI =========
+      function initLevelSelect(levelCount) {
+        levelSelect.innerHTML = "";
+        for (let i = 1; i <= levelCount; i++) {
+          const opt = document.createElement("option");
+          opt.value = String(i);
+          opt.textContent = `Level ${i}`;
+          levelSelect.appendChild(opt);
+        }
+        levelSelect.value = "1";
+      }
+
+      // ========= CSV reorder: N5->N1 =========
+      function getColumnIndexes(headerRow) {
+        const header = (headerRow || []).map((h) =>
+          (h || "").trim().toLowerCase()
+        );
+        const idxOriginal =
+          header.indexOf("original") >= 0 ? header.indexOf("original") : 0;
+        const idxFurigana =
+          header.indexOf("furigana") >= 0 ? header.indexOf("furigana") : 1;
+        const idxEnglish =
+          header.indexOf("english") >= 0 ? header.indexOf("english") : 2;
+
+        let idxJLPT = header.indexOf("jlpt level");
+        if (idxJLPT < 0) idxJLPT = header.indexOf("jlpt");
+        if (idxJLPT < 0) idxJLPT = header.indexOf("level");
+        return { idxOriginal, idxFurigana, idxEnglish, idxJLPT };
+      }
+
+      function reorderRowsToWords(rows) {
+        const { idxOriginal, idxFurigana, idxEnglish, idxJLPT } =
+          getColumnIndexes(rows[0] || []);
+        const groups = { N5: [], N4: [], N3: [], N2: [], N1: [], OTHER: [] };
+
+        for (let r = 1; r < rows.length; r++) {
+          const row = rows[r] || [];
+          const kanji = (row[idxOriginal] ?? "").trim();
+          const furigana = (row[idxFurigana] ?? "").trim();
+          const meaning = (row[idxEnglish] ?? "").trim();
+
+          const jlptRaw = (idxJLPT >= 0 ? row[idxJLPT] ?? "" : "")
+            .toString()
+            .trim()
+            .toUpperCase();
+          const jlpt = jlptRaw.match(/^N[1-5]$/) ? jlptRaw : "OTHER";
+
+          const furiganaH = kataToHira(furigana);
+          const romaji = furigana
+            ? normalizeRomaji(kanaToRomaji(furiganaH))
+            : "";
+
+          const w = {
+            kanji: kanji || "—",
+            meaning: meaning || "—",
+            furigana: furigana || "",
+            furiganaH: furiganaH || "",
+            romaji,
+            jlpt,
+          };
+
+          if (groups[jlpt]) groups[jlpt].push(w);
+          else groups.OTHER.push(w);
+        }
+
+        const ordered = [
+          ...groups.N5,
+          ...groups.N4,
+          ...groups.N3,
+          ...groups.N2,
+          ...groups.N1,
+          ...groups.OTHER,
+        ];
+        return { ordered };
+      }
+
+      // ========= Load CSV =========
+      async function loadCSVAuto() {
+        try {
+          const res = await fetch("jlpt_vocab.csv", { cache: "no-store" });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+          const text = await res.text();
+          const rows = parseCSV(text);
+          if (rows.length < 2) throw new Error("CSV has no data rows.");
+
+          const { ordered } = reorderRowsToWords(rows);
+
+          const MAX_WORDS = 81 * 100;
+          orderedWords = ordered.slice(0, MAX_WORDS);
+
+          totalLevels = Math.max(
+            1,
+            Math.ceil(orderedWords.length / WORDS_PER_LEVEL)
+          );
+          initLevelSelect(totalLevels);
+
+          // Restore last selection
+          const savedLvl = Number(
+            localStorage.getItem("flowmanLastLevel") || "1"
+          );
+          levelSelect.value = String(
+            Math.min(totalLevels, Math.max(1, savedLvl))
+          );
+
+          const savedMode = localStorage.getItem("flowmanLastMode");
+          if (
+            savedMode === "easy" ||
+            savedMode === "normal" ||
+            savedMode === "hard"
+          ) {
+            modeSelect.value = savedMode;
+          }
+
+          const savedPlay = localStorage.getItem("flowmanPlayFrom");
+          if (savedPlay) playFromSelect.value = savedPlay;
+
+          // Auto-load level
+          loadSelectedLevel();
+
+          btnStart.disabled = levelWords.length === 0;
+          setToast("ok", "Ready.");
+          updateStats();
+        } catch (err) {
+          console.error(err);
+          setToast("bad", "Couldn’t load jlpt_vocab.csv (use a local server).");
+        }
+      }
+
+      function loadSelectedLevel() {
+        const lvl = Number(levelSelect.value);
+        const startIdx = (lvl - 1) * WORDS_PER_LEVEL;
+        const endIdx = Math.min(
+          orderedWords.length,
+          startIdx + WORDS_PER_LEVEL
+        );
+
+        levelSlice = orderedWords.slice(startIdx, endIdx);
+
+        // playable requires a reading we can test against (furigana)
+        const playable = levelSlice.filter(
+          (w) => w.furiganaH && normalizeKana(w.furiganaH).length > 0
+        );
+
+        // filter by familiarity bucket (from FluencyFlow)
+        const bucket = getPlayFrom();
+        if (bucket === "all") {
+          levelWords = playable;
+        } else {
+          levelWords = playable.filter(
+            (w) => ffGetFamiliarityForWord(w) === bucket
+          );
+        }
+
+        resetRunState();
+        btnResetRun.disabled = false;
+        btnStart.disabled = levelWords.length === 0;
+
+        updateStats();
+
+        const bucketLabel = bucket === "all" ? "All" : bucket.replace("_", " ");
+        setToast(
+          levelWords.length ? "ok" : "bad",
+          levelWords.length
+            ? `Level loaded (${bucketLabel}). Press Start.`
+            : `No playable words in this level for: ${bucketLabel}.`
+        );
+      }
+
+      // ========= Mode UI =========
+      function applyModeUI() {
+        const mode = getMode();
+
+        hardAnswerWrap.style.display = mode === "hard" ? "inline-flex" : "none";
+        toggleFurigana.disabled = mode !== "easy";
+
+        kanjiText.style.display = "block";
+        meaningText.classList.remove("hard");
+        blanksEl.style.display = "flex";
+        mcqArea.style.display = "none";
+
+        fullGuess.style.display = "inline-block";
+        btnSubmit.style.display = "inline-block";
+        btnHint.style.display = "inline-block";
+        btnSkip.style.display = "inline-block";
+
+        furiganaLine.style.display = "none";
+
+        if (mode === "easy") {
+          fullGuess.placeholder = "Type romaji and press Enter…";
+          furiganaLine.style.display = toggleFurigana.checked
+            ? "block"
+            : "none";
+          btnHint.style.display = "inline-block";
+        }
+
+        if (mode === "normal") {
+          fullGuess.placeholder = "Type kana/romaji to guess the full reading…";
+          btnHint.style.display = "none";
+        }
+
+        if (mode === "hard") {
+          kanjiText.style.display = "none";
+          furiganaLine.style.display = "none";
+          blanksEl.style.display = "none";
+          meaningText.classList.add("hard");
+
+          fullGuess.style.display = "none";
+          btnSubmit.style.display = "none";
+          btnHint.style.display = "none";
+
+          mcqArea.style.display = "block";
+        }
+
+        placeKeyboard();
+        buildKeyboardForMode();
+
+        if (mode === "hard") {
+          kbdHint.style.display = "none";
+          keyboardEl.style.display = "none";
+        } else {
+          keyboardEl.style.display = "";
+        }
+      }
+
+      // ========= Game =========
+      function renderBlanks() {
+        blanksEl.innerHTML = "";
+        displayLetters.forEach((ch, i) => {
+          const slot = document.createElement("div");
+          slot.className = "slot" + (revealed.has(i) ? " revealed" : "");
+          slot.textContent = revealed.has(i) ? ch : " ";
+          blanksEl.appendChild(slot);
+        });
+      }
+
+      function revealAllLetters() {
+        revealed = new Set(displayLetters.map((_, i) => i));
+        renderBlanks();
+      }
+
+      function isSolvedLetters() {
+        return (
+          revealed.size >= displayLetters.length && displayLetters.length > 0
+        );
+      }
+
+      function resetRunState() {
+        remaining = levelWords.map((_, i) => i);
+
+        current = null;
+        targetRomaji = "";
+        targetKanaNorm = "";
+
+        displayLetters = [];
+        revealed = new Set();
+        guessedLetters = new Set();
+        wrong = 0;
+
+        solved = 0;
+        streak = 0;
+
+        fullGuess.value = "";
+        blanksEl.innerHTML = "";
+        mcqGrid.innerHTML = "";
+
+        kanjiText.textContent = "—";
+        meaningText.textContent = "—";
+        furiganaLine.textContent = "Furigana: —";
+
+        setFrameByWrong();
+        applyModeUI();
+        resetKeyStates();
+        updateStats();
+      }
+
+      function pickNextIndex() {
+        if (remaining.length === 0) return -1;
+        const r = Math.floor(Math.random() * remaining.length);
+        return remaining.splice(r, 1)[0];
+      }
+
+      function startOrRestart() {
+        ensureBgmRunning();
+        loadSelectedLevel();
+        if (!levelWords.length) {
+          setToast("bad", "No playable words in this selection.");
+          return;
+        }
+        startRun();
+      }
+
+      function startRun() {
+        remaining = levelWords.map((_, i) => i);
+        solved = 0;
+        streak = 0;
+        nextWord();
+        setToast("ok", "Run started.");
+        updateStats();
+      }
+
+      function nextWord() {
+        const idx = pickNextIndex();
+        if (idx === -1) {
+          setToast("ok", `Finished! Solved ${solved}/${levelTargetCount()}.`);
+          return;
+        }
+
+        current = levelWords[idx];
+
+        // ✅ record exposure as soon as the word appears
+        try {
+          if (current) ffRecordExposure(current);
+        } catch (e) {}
+
+        wrong = 0;
+        guessedLetters = new Set();
+        revealed = new Set();
+        fullGuess.value = "";
+        mcqGrid.innerHTML = "";
+
+        kanjiText.textContent = current.kanji;
+        meaningText.textContent = current.meaning;
+        furiganaLine.textContent = `Furigana: ${current.furigana || "—"}`;
+
+        targetKanaNorm = normalizeKana(current.furiganaH);
+        targetRomaji =
+          current.romaji || normalizeRomaji(kanaToRomaji(current.furiganaH));
+
+        const mode = getMode();
+        if (mode === "easy") {
+          displayLetters = (targetRomaji || "").split("");
+          renderBlanks();
+        } else if (mode === "normal") {
+          displayLetters = (targetKanaNorm || "").split("");
+          renderBlanks();
+        } else {
+          displayLetters = [];
+          blanksEl.innerHTML = "";
+        }
+
+        setFrameByWrong();
+        applyModeUI();
+        resetKeyStates();
+
+        if (getMode() === "hard") buildMCQChoices();
+
+        updateStats();
+
+        if (getMode() !== "hard") fullGuess.focus();
+      }
+
+      function loseLife(extraMsg) {
+        const maxWrong = getMaxWrong();
+        wrong++;
+        setFrameByWrong();
+        beep("bad");
+        const left = Math.max(0, maxWrong - wrong);
+        setToast(
+          "bad",
+          extraMsg
+            ? `${extraMsg}  Lives left: ${left}`
+            : `Wrong. Lives left: ${left}`
+        );
+        updateStats();
+
+        if (wrong >= maxWrong) {
+          streak = 0;
+
+          const answer =
+            current && (current.kanji || current.furigana)
+              ? `${current.kanji || "—"} / ${current.furigana || "—"}`
+              : current
+              ? current.furigana || targetRomaji || "—"
+              : "—";
+
+          setToast("bad", `Out of lives. Answer: ${answer}`);
+
+          if (getMode() === "easy" || getMode() === "normal") {
+            revealAllLetters();
+          }
+
+          updateStats();
+          setTimeout(nextWord, 900);
+        }
+      }
+
+      function winWord() {
+        // ✅ Full-word success sync
+        try {
+          if (current) {
+            // 1) Award FluencyFlow familiarity + points
+            ffAwardProgressForWin(current);
+            // 2) Record Flowman completion difficulty for colored circle badge
+            recordFlowmanWin(current, getMode());
+          }
+        } catch (e) {
+          console.warn("Sync failed:", e);
+        }
+
+        beep("ok");
+        solved++;
+        streak++;
+        updateStats();
+
+        if (getMode() === "easy" || getMode() === "normal") {
+          revealAllLetters();
+        }
+
+        setToast("ok", "Correct!");
+        setTimeout(nextWord, 650);
+      }
+
+      function onLetterGuess(ch) {
+        if (getMode() !== "easy") return;
+        if (!current) return;
+
+        ensureBgmRunning();
+
+        ch = normalizeRomaji(ch);
+        if (!ch || ch.length !== 1) return;
+        if (guessedLetters.has(ch)) return;
+
+        guessedLetters.add(ch);
+
+        if (targetRomaji.includes(ch)) {
+          displayLetters.forEach((c, i) => {
+            if (c === ch) revealed.add(i);
+          });
+          markKey(ch, "good");
+          beep("ok");
+          renderBlanks();
+          if (isSolvedLetters()) winWord();
+        } else {
+          markKey(ch, "bad");
+          loseLife();
+        }
+      }
+
+      function onKanaGuess(kana) {
+        if (getMode() !== "normal") return;
+        if (!current) return;
+
+        ensureBgmRunning();
+
+        const ch = String(kana || "");
+        if (!ch) return;
+        if (guessedLetters.has(ch)) return;
+
+        guessedLetters.add(ch);
+
+        if (displayLetters.includes(ch)) {
+          displayLetters.forEach((c, i) => {
+            if (c === ch) revealed.add(i);
+          });
+          markKey(ch, "good");
+          beep("ok");
+          renderBlanks();
+          if (isSolvedLetters()) winWord();
+        } else {
+          markKey(ch, "bad");
+          loseLife();
+        }
+      }
+
+      function submitGuess() {
+        if (!current) return;
+        ensureBgmRunning();
+
+        const mode = getMode();
+        if (mode === "hard") return;
+
+        const raw = fullGuess.value;
+
+        if (mode === "easy") {
+          const romajiGuess = normalizeRomaji(raw);
+          if (!romajiGuess) return;
+          if (romajiGuess === targetRomaji) {
+            winWord();
+          } else {
+            loseLife();
+            fullGuess.select();
+          }
+          return;
+        }
+
+        const kanaGuessNorm = normalizeKana(kataToHira(raw));
+        const romajiGuess = normalizeRomaji(raw);
+        const kanaOK = kanaGuessNorm && kanaGuessNorm === targetKanaNorm;
+        const romajiOK = romajiGuess && romajiGuess === targetRomaji;
+
+        if (kanaOK || romajiOK) {
+          winWord();
+        } else {
+          loseLife();
+          fullGuess.select();
+        }
+      }
+
+      function buildMCQChoices() {
+        if (getMode() !== "hard") return;
+        if (!current) return;
+
+        const mode = getHardAnswerMode(); // "reading" | "kanji"
+        const needed = Math.min(21, levelWords.length);
+
+        const correctKey =
+          mode === "kanji"
+            ? String(current.kanji || "")
+            : normalizeKana(current.furiganaH);
+
+        const pool = levelWords
+          .filter((w) => w !== current)
+          .filter((w) => {
+            const k =
+              mode === "kanji"
+                ? String(w.kanji || "")
+                : normalizeKana(w.furiganaH);
+            return k && k !== correctKey;
+          });
+
+        shuffle(pool);
+
+        const picks = [];
+        const used = new Set();
+
+        picks.push(current);
+        used.add(correctKey);
+
+        for (const w of pool) {
+          if (picks.length >= needed) break;
+          const k =
+            mode === "kanji"
+              ? String(w.kanji || "")
+              : normalizeKana(w.furiganaH);
+          if (!k || used.has(k)) continue;
+          used.add(k);
+          picks.push(w);
+        }
+
+        shuffle(picks);
+
+        mcqHint.textContent =
+          mode === "kanji"
+            ? `Pick the correct kanji (${picks.length} options).`
+            : `Pick the correct reading (${picks.length} options).`;
+
+        mcqGrid.innerHTML = "";
+
+        picks.forEach((w) => {
+          const b = document.createElement("button");
+          b.className = "mcqBtn";
+          b.textContent =
+            mode === "kanji"
+              ? w.kanji || "—"
+              : w.furigana || w.furiganaH || "—";
+          b.addEventListener("click", () => {
+            onMCQPick(w, b);
+          });
+          mcqGrid.appendChild(b);
+        });
+      }
+
+      function onMCQPick(word, btn) {
+        if (getMode() !== "hard") return;
+        if (!current) return;
+
+        ensureBgmRunning();
+
+        const mode = getHardAnswerMode();
+        const correct =
+          mode === "kanji"
+            ? String(word.kanji || "") === String(current.kanji || "")
+            : normalizeKana(word.furiganaH) ===
+              normalizeKana(current.furiganaH);
+
+        if (correct) {
+          btn.classList.add("good");
+          [...mcqGrid.querySelectorAll("button")].forEach(
+            (b) => (b.disabled = true)
+          );
+          winWord();
+        } else {
+          btn.classList.add("bad");
+          btn.disabled = true;
+          loseLife("Nope.");
+        }
+      }
+
+      function hint() {
+        if (getMode() !== "easy") return;
+        if (!current) return;
+
+        ensureBgmRunning();
+
+        const hidden = [];
+        for (let i = 0; i < displayLetters.length; i++) {
+          if (!revealed.has(i)) hidden.push(i);
+        }
+        if (hidden.length === 0) return;
+
+        const pick = hidden[Math.floor(Math.random() * hidden.length)];
+        revealed.add(pick);
+        renderBlanks();
+
+        setToast("ok", "Hint used.");
+        if (isSolvedLetters()) winWord();
+      }
+
+      function skipWord() {
+        if (!current) return;
+        ensureBgmRunning();
+
+        streak = 0;
+        setToast(
+          "bad",
+          `Skipped. Answer: ${current.kanji || "—"} / ${
+            current.furigana || targetRomaji || "—"
+          }`
+        );
+        updateStats();
+        setTimeout(nextWord, 350);
+      }
+
+      // ========= Events =========
+      btnStart.addEventListener("click", startOrRestart);
+
+      btnResetRun.addEventListener("click", () => {
+        ensureBgmRunning();
+        resetRunState();
+        setToast("ok", "Reset.");
+        btnStart.disabled = levelWords.length === 0;
+      });
+
+      btnPrevLevel.addEventListener("click", () => {
+        ensureBgmRunning();
+        const v = Math.max(1, Number(levelSelect.value) - 1);
+        levelSelect.value = String(v);
+        localStorage.setItem("flowmanLastLevel", String(v));
+        loadSelectedLevel();
+      });
+
+      btnNextLevel.addEventListener("click", () => {
+        ensureBgmRunning();
+        const v = Math.min(totalLevels, Number(levelSelect.value) + 1);
+        levelSelect.value = String(v);
+        localStorage.setItem("flowmanLastLevel", String(v));
+        loadSelectedLevel();
+      });
+
+      levelSelect.addEventListener("change", () => {
+        ensureBgmRunning();
+        localStorage.setItem("flowmanLastLevel", String(levelSelect.value));
+        loadSelectedLevel();
+      });
+
+      playFromSelect.addEventListener("change", () => {
+        localStorage.setItem("flowmanPlayFrom", String(getPlayFrom()));
+        loadSelectedLevel();
+      });
+
+      modeSelect.addEventListener("change", () => {
+        ensureBgmRunning();
+        localStorage.setItem("flowmanLastMode", String(getMode()));
+        resetRunState();
+        btnStart.disabled = levelWords.length === 0;
+        setToast("ok", `Mode: ${getMode()}`);
+      });
+
+      toggleFurigana.addEventListener("change", () => {
+        applyModeUI();
+      });
+
+      hardAnswerSelect.addEventListener("change", () => {
+        if (getMode() === "hard" && current) buildMCQChoices();
+      });
+
+      btnSubmit.addEventListener("click", submitGuess);
+      fullGuess.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          submitGuess();
+        }
+      });
+
+      btnHint.addEventListener("click", hint);
+      btnSkip.addEventListener("click", skipWord);
+
+      muteMusic.addEventListener("change", applyMuteState);
+
+      let resizeTimer = null;
+      window.addEventListener("resize", () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          if (getMode() === "normal") {
+            placeKeyboard();
+            buildKeyboardForMode();
+          }
+        }, 120);
+      });
+
+      // ========= Init =========
+      initSprite();
+      applyMuteState();
+      placeKeyboard();
+      applyModeUI();
+      setToast("ok", "Loading jlpt_vocab.csv…");
+      updateStats();
+      loadCSVAuto();
+    </script>
+  </body>
+</html>
