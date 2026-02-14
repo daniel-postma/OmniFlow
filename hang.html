@@ -311,7 +311,6 @@
       const SPRITE_COLS = 3;
 
       // ⭐ thresholds
-      // 3⭐ must be >= 15 WPM (slightly faster than your 14.97)
       const STAR_1_WPM = 8;
       const STAR_2_WPM = 12;
       const STAR_3_WPM = 15;
@@ -320,6 +319,12 @@
       const LS_THEME = "flowmanTheme"; // "light" | "dark"
       const THEME_LIGHT = "hang.css";
       const THEME_DARK = "hangdark.css";
+
+      // Persist selection
+      const LS_LEVEL_SELECT = "flowmanLevelSelect"; // "level:33" | "test:N3"
+      const LS_LAST_NUM_LEVEL = "flowmanLastLevel"; // numeric 1..81 for prev/next
+      const LS_LAST_MODE = "flowmanLastMode";
+      const LS_PLAY_FROM = "flowmanPlayFrom";
 
       const QWERTY_ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
 
@@ -351,13 +356,10 @@
       const FF_RANK = { unknown: 0, explored: 1, known: 2, well_known: 3 };
 
       // ========= Flowman completion sync (LOCALSTORAGE) =========
-      // Tracker can show colored circle based on this map:
-      // { [wordKey]: "easy" | "normal" | "hard" }
       const LS_FLOWMAN = "flowmanHighest";
       const FLOW_RANK = { none: 0, easy: 1, normal: 2, hard: 3 };
 
       // ========= NEW: badges (LocalStorage) =========
-      // Must be import/exported by tracker.
       const LS_FLOWMAN_BADGES = "flowmanBadges_v1";
 
       function ffTodayKey() {
@@ -466,9 +468,13 @@
       let orderedWords = [];
       let totalLevels = 1;
 
+      // For "Level N" we compute this slice; for tests we don't use it as the run pool.
       let levelSlice = [];
       let levelWords = [];
-      let remaining = [];
+
+      // Run words (the actual 100/level pool used this run)
+      let runWords = [];
+      let runRemaining = [];
 
       let current = null;
       let targetRomaji = "";
@@ -528,9 +534,7 @@
       }
 
       function levelTargetCount() {
-        const bucket = getPlayFrom();
-        if (bucket !== "all") return Math.max(1, levelWords.length);
-        return Math.max(1, levelSlice.length || WORDS_PER_LEVEL);
+        return Math.max(1, runWords.length || 0);
       }
 
       function updateStats() {
@@ -557,8 +561,6 @@
       }
 
       // ======== ROMAJI NORMALIZATION (ACCEPT VARIANTS) ========
-      // Keep canonical answers the same (your kanaToRomaji output),
-      // but accept common variant spellings from users.
       function normalizeRomaji(s) {
         const base = (s || "")
           .toLowerCase()
@@ -571,30 +573,22 @@
           .replace(/ē/g, "ee")
           .replace(/ō/g, "ou");
 
-        // Convert common variants -> your canonical hepburn-ish forms
-        // (so "jyo" matches target "jo", etc.)
-        return (
-          base
-            // ya/yu/yo series (people type y)
-            .replace(/jya/g, "ja")
-            .replace(/jyu/g, "ju")
-            .replace(/jyo/g, "jo")
-            .replace(/sya/g, "sha")
-            .replace(/syu/g, "shu")
-            .replace(/syo/g, "sho")
-            .replace(/tya/g, "cha")
-            .replace(/tyu/g, "chu")
-            .replace(/tyo/g, "cho")
-            // optional: kunrei "zya/zyu/zyo"
-            .replace(/zya/g, "ja")
-            .replace(/zyu/g, "ju")
-            .replace(/zyo/g, "jo")
-            // common alt for じ/ぢ
-            .replace(/zi/g, "ji")
-            // common alt for づ
-            .replace(/dzu/g, "zu")
-            .replace(/du/g, "zu")
-        );
+        return base
+          .replace(/jya/g, "ja")
+          .replace(/jyu/g, "ju")
+          .replace(/jyo/g, "jo")
+          .replace(/sya/g, "sha")
+          .replace(/syu/g, "shu")
+          .replace(/syo/g, "sho")
+          .replace(/tya/g, "cha")
+          .replace(/tyu/g, "chu")
+          .replace(/tyo/g, "cho")
+          .replace(/zya/g, "ja")
+          .replace(/zyu/g, "ju")
+          .replace(/zyo/g, "jo")
+          .replace(/zi/g, "ji")
+          .replace(/dzu/g, "zu")
+          .replace(/du/g, "zu");
       }
 
       function normalizeKana(s) {
@@ -660,10 +654,9 @@
         if (timerInterval) clearInterval(timerInterval);
         timerInterval = null;
         timerText.textContent = "0:00";
-        timerPill.style.display = "none"; // hidden until progress
+        timerPill.style.display = "none";
       }
 
-      // Start timing on first meaningful interaction (prevents idle “Start” time)
       function startStopwatchIfNeeded() {
         if (runStarted) return;
         runStarted = true;
@@ -686,7 +679,6 @@
         timerText.textContent = msToClock(runElapsedMs);
       }
 
-      // Show timer only after the level is progressed (first solved word)
       function ensureTimerVisibleAfterProgress() {
         if (solved >= 1) timerPill.style.display = "inline-flex";
       }
@@ -717,21 +709,19 @@
 
       function awardBadgesForRun({ jlpt, mode, bucket, wpm, stars }) {
         const b = readBadges();
-        b.best = b.best || {}; // best stars per run-key
-        b.stats = b.stats || {}; // general stats
-        b.earned = b.earned || {}; // boolean badge flags
+        b.best = b.best || {};
+        b.stats = b.stats || {};
+        b.earned = b.earned || {};
 
         const key = badgeKeyForRun(jlpt, mode, bucket);
         const prev = Number(b.best[key] || 0);
         if (stars > prev) b.best[key] = stars;
 
-        // track bestWpm overall
         const prevW = Number(b.stats.bestWpm || 0);
         if (wpm > prevW) b.stats.bestWpm = Number(wpm.toFixed(2));
 
-        // badge flags (simple & useful)
         if (stars >= 3) b.earned.threeStar = true;
-        if (wpm >= 15) b.earned.wpm15 = true; // your “feral” gate
+        if (wpm >= 15) b.earned.wpm15 = true;
         if (wpm >= 20) b.earned.wpm20 = true;
 
         writeBadges(b);
@@ -1132,16 +1122,40 @@
         key.disabled = true;
       }
 
-      // ========= Level UI =========
+      // ========= Level Dropdown: Levels + JLPT Tests =========
       function initLevelSelect(levelCount) {
         levelSelect.innerHTML = "";
+
         for (let i = 1; i <= levelCount; i++) {
           const opt = document.createElement("option");
-          opt.value = String(i);
+          opt.value = `level:${i}`;
           opt.textContent = `Level ${i}`;
           levelSelect.appendChild(opt);
         }
-        levelSelect.value = "1";
+
+        const divider = document.createElement("option");
+        divider.disabled = true;
+        divider.textContent = "──────────";
+        levelSelect.appendChild(divider);
+
+        ["N5", "N4", "N3", "N2", "N1"].forEach((n) => {
+          const opt = document.createElement("option");
+          opt.value = `test:${n}`;
+          opt.textContent = `${n} Test`;
+          levelSelect.appendChild(opt);
+        });
+      }
+
+      function getSelectedLevelKind() {
+        const v = String(levelSelect.value || "");
+        if (v.startsWith("test:"))
+          return { kind: "test", jlpt: v.split(":")[1] || "OTHER" };
+        if (v.startsWith("level:")) {
+          const n = Number(v.split(":")[1] || "1");
+          return { kind: "level", level: Math.max(1, n | 0) };
+        }
+        const n = Number(v || "1");
+        return { kind: "level", level: Math.max(1, n | 0) };
       }
 
       // ========= CSV reorder: N5->N1 =========
@@ -1229,14 +1243,26 @@
           );
           initLevelSelect(totalLevels);
 
-          const savedLvl = Number(
-            localStorage.getItem("flowmanLastLevel") || "1"
+          // restore selection
+          const savedSel = localStorage.getItem(LS_LEVEL_SELECT);
+          const savedNum = Number(
+            localStorage.getItem(LS_LAST_NUM_LEVEL) || "1"
           );
-          levelSelect.value = String(
-            Math.min(totalLevels, Math.max(1, savedLvl))
-          );
+          const fallback = `level:${Math.min(
+            totalLevels,
+            Math.max(1, savedNum)
+          )}`;
 
-          const savedMode = localStorage.getItem("flowmanLastMode");
+          if (
+            savedSel &&
+            [...levelSelect.options].some((o) => o.value === savedSel)
+          ) {
+            levelSelect.value = savedSel;
+          } else {
+            levelSelect.value = fallback;
+          }
+
+          const savedMode = localStorage.getItem(LS_LAST_MODE);
           if (
             savedMode === "easy" ||
             savedMode === "normal" ||
@@ -1245,12 +1271,12 @@
             modeSelect.value = savedMode;
           }
 
-          const savedPlay = localStorage.getItem("flowmanPlayFrom");
+          const savedPlay = localStorage.getItem(LS_PLAY_FROM);
           if (savedPlay) playFromSelect.value = savedPlay;
 
           loadSelectedLevel();
 
-          btnStart.disabled = levelWords.length === 0;
+          btnStart.disabled = getPoolWordsForSelection().length === 0;
           setToast("ok", "Ready.");
           updateStats();
         } catch (err) {
@@ -1259,41 +1285,92 @@
         }
       }
 
-      function loadSelectedLevel() {
-        const lvl = Number(levelSelect.value);
-        const startIdx = (lvl - 1) * WORDS_PER_LEVEL;
+      function getLevelSliceWords(levelNum) {
+        const startIdx = (levelNum - 1) * WORDS_PER_LEVEL;
         const endIdx = Math.min(
           orderedWords.length,
           startIdx + WORDS_PER_LEVEL
         );
+        return orderedWords.slice(startIdx, endIdx);
+      }
 
-        levelSlice = orderedWords.slice(startIdx, endIdx);
-
-        const playable = levelSlice.filter(
-          (w) => w.furiganaH && normalizeKana(w.furiganaH).length > 0
-        );
-
+      function getPoolWordsForSelection() {
+        const sel = getSelectedLevelKind();
         const bucket = getPlayFrom();
-        if (bucket === "all") {
-          levelWords = playable;
-        } else {
-          levelWords = playable.filter(
-            (w) => ffGetFamiliarityForWord(w) === bucket
+
+        let pool = [];
+        if (sel.kind === "test") {
+          pool = orderedWords.filter(
+            (w) =>
+              w.jlpt === sel.jlpt &&
+              w.furiganaH &&
+              normalizeKana(w.furiganaH).length > 0
           );
+        } else {
+          pool = levelWords;
+        }
+
+        if (sel.kind === "test" && bucket !== "all") {
+          pool = pool.filter((w) => ffGetFamiliarityForWord(w) === bucket);
+        }
+
+        return pool;
+      }
+
+      function buildRunWords() {
+        const sel = getSelectedLevelKind();
+        const pool = getPoolWordsForSelection();
+
+        if (sel.kind === "test") {
+          const copy = pool.slice();
+          shuffle(copy);
+          return copy.slice(0, WORDS_PER_LEVEL);
+        }
+
+        return pool;
+      }
+
+      function loadSelectedLevel() {
+        const sel = getSelectedLevelKind();
+        const bucket = getPlayFrom();
+
+        if (sel.kind === "level") {
+          levelSlice = getLevelSliceWords(sel.level);
+
+          const playable = levelSlice.filter(
+            (w) => w.furiganaH && normalizeKana(w.furiganaH).length > 0
+          );
+
+          if (bucket === "all") levelWords = playable;
+          else
+            levelWords = playable.filter(
+              (w) => ffGetFamiliarityForWord(w) === bucket
+            );
+
+          localStorage.setItem(LS_LAST_NUM_LEVEL, String(sel.level));
+        } else {
+          // tests don't use the level slice
+          levelSlice = [];
+          levelWords = [];
         }
 
         resetRunState();
         btnResetRun.disabled = false;
-        btnStart.disabled = levelWords.length === 0;
+
+        const pool = getPoolWordsForSelection();
+        btnStart.disabled = pool.length === 0;
 
         updateStats();
 
+        const label =
+          sel.kind === "test" ? `${sel.jlpt} Test` : `Level ${sel.level}`;
         const bucketLabel = bucket === "all" ? "All" : bucket.replace("_", " ");
+
         setToast(
-          levelWords.length ? "ok" : "bad",
-          levelWords.length
-            ? `Level loaded (${bucketLabel}). Press Start.`
-            : `No playable words in this level for: ${bucketLabel}.`
+          pool.length ? "ok" : "bad",
+          pool.length
+            ? `Loaded (${label} • ${bucketLabel}). Press Start.`
+            : `No playable words in this selection for: ${label} • ${bucketLabel}.`
         );
       }
 
@@ -1314,11 +1391,11 @@
         btnHint.style.display = "inline-block";
         btnSkip.style.display = "inline-block";
 
-        // ✅ Default: hide; easy-mode can show above kanji
         furiganaLine.style.display = "none";
 
         if (mode === "easy") {
-          fullGuess.placeholder = "Type romaji and press Enter…";
+          // ✅ required
+          fullGuess.placeholder = "Type romaji OR kana and press Enter…";
           furiganaLine.style.display = toggleFurigana.checked
             ? "block"
             : "none";
@@ -1377,7 +1454,8 @@
       }
 
       function resetRunState() {
-        remaining = levelWords.map((_, i) => i);
+        runWords = [];
+        runRemaining = [];
 
         current = null;
         targetRomaji = "";
@@ -1397,7 +1475,6 @@
 
         kanjiText.textContent = "";
         meaningText.textContent = "";
-        // ✅ label removed
         furiganaLine.textContent = "";
 
         setFrameByWrong();
@@ -1410,34 +1487,42 @@
       }
 
       function pickNextIndex() {
-        if (remaining.length === 0) return -1;
-        const r = Math.floor(Math.random() * remaining.length);
-        return remaining.splice(r, 1)[0];
+        if (runRemaining.length === 0) return -1;
+        const r = Math.floor(Math.random() * runRemaining.length);
+        return runRemaining.splice(r, 1)[0];
       }
 
       function startOrRestart() {
         ensureBgmRunning();
         loadSelectedLevel();
-        if (!levelWords.length) {
+
+        const pool = getPoolWordsForSelection();
+        if (!pool.length) {
           setToast("bad", "No playable words in this selection.");
           return;
         }
+
         startRun();
       }
 
       function startRun() {
-        remaining = levelWords.map((_, i) => i);
+        runWords = buildRunWords();
+        runRemaining = runWords.map((_, i) => i);
+
         solved = 0;
         streak = 0;
 
-        resetStopwatch(); // fresh run
+        resetStopwatch();
         nextWord();
         setToast("ok", "Run started.");
         updateStats();
       }
 
       function currentJlptForSelection() {
-        const w = (levelSlice && levelSlice[0]) || null;
+        const sel = getSelectedLevelKind();
+        if (sel.kind === "test") return sel.jlpt;
+
+        const w = (levelSlice && levelSlice[0]) || current || null;
         return (w && w.jlpt) || "OTHER";
       }
 
@@ -1575,7 +1660,7 @@
           return;
         }
 
-        current = levelWords[idx];
+        current = runWords[idx];
 
         try {
           if (current) ffRecordExposure(current);
@@ -1590,13 +1675,9 @@
         kanjiText.textContent = current.kanji;
         meaningText.textContent = current.meaning;
 
-        // ✅ label removed: only the furigana itself
         furiganaLine.textContent = current.furigana || "";
 
         targetKanaNorm = normalizeKana(current.furiganaH);
-
-        // IMPORTANT: normalizeRomaji now also folds user variants,
-        // but for targets that's fine (keeps canonical style stable).
         targetRomaji =
           current.romaji || normalizeRomaji(kanaToRomaji(current.furiganaH));
 
@@ -1746,14 +1827,20 @@
         const mode = getMode();
         if (mode === "hard") return;
 
-        const raw = fullGuess.value;
+        const raw = fullGuess.value || "";
 
         if (mode === "easy") {
-          const romajiGuess = normalizeRomaji(raw);
-          if (!romajiGuess) return;
+          // ✅ easy accepts kana OR romaji
+          const kanaGuessNorm = normalizeKana(kataToHira(raw));
+          const kanaOK = kanaGuessNorm && kanaGuessNorm === targetKanaNorm;
 
-          // ✅ now accepts variants like jyo -> jo, syo -> sho, tyo -> cho, zi -> ji, etc.
-          if (romajiGuess === targetRomaji) {
+          const romajiGuess = normalizeRomaji(raw);
+          const romajiFromKana = normalizeRomaji(kanaToRomaji(kataToHira(raw)));
+          const romajiOK =
+            (romajiGuess && romajiGuess === targetRomaji) ||
+            (romajiFromKana && romajiFromKana === targetRomaji);
+
+          if (kanaOK || romajiOK) {
             winWord();
           } else {
             loseLife();
@@ -1762,6 +1849,7 @@
           return;
         }
 
+        // normal: kana OR romaji
         const kanaGuessNorm = normalizeKana(kataToHira(raw));
         const romajiGuess = normalizeRomaji(raw);
         const kanaOK = kanaGuessNorm && kanaGuessNorm === targetKanaNorm;
@@ -1780,14 +1868,23 @@
         if (!current) return;
 
         const mode = getHardAnswerMode();
-        const needed = Math.min(21, levelWords.length);
+
+        // Use same JLPT pool (feels "test-like" even in hard mode)
+        const poolAll = orderedWords.filter(
+          (w) =>
+            w.jlpt === current.jlpt &&
+            w.furiganaH &&
+            normalizeKana(w.furiganaH).length > 0
+        );
+
+        const needed = Math.min(21, poolAll.length);
 
         const correctKey =
           mode === "kanji"
             ? String(current.kanji || "")
             : normalizeKana(current.furiganaH);
 
-        const pool = levelWords
+        const pool = poolAll
           .filter((w) => w !== current)
           .filter((w) => {
             const k =
@@ -1830,9 +1927,7 @@
           b.className = "mcqBtn";
           b.textContent =
             mode === "kanji" ? w.kanji || "" : w.furigana || w.furiganaH || "";
-          b.addEventListener("click", () => {
-            onMCQPick(w, b);
-          });
+          b.addEventListener("click", () => onMCQPick(w, b));
           mcqGrid.appendChild(b);
         });
       }
@@ -1908,41 +2003,55 @@
         ensureBgmRunning();
         resetRunState();
         setToast("ok", "Reset.");
-        btnStart.disabled = levelWords.length === 0;
+        btnStart.disabled = getPoolWordsForSelection().length === 0;
       });
 
       btnPrevLevel.addEventListener("click", () => {
         ensureBgmRunning();
-        const v = Math.max(1, Number(levelSelect.value) - 1);
-        levelSelect.value = String(v);
-        localStorage.setItem("flowmanLastLevel", String(v));
+        const sel = getSelectedLevelKind();
+
+        let curNum =
+          sel.kind === "level"
+            ? sel.level
+            : Number(localStorage.getItem(LS_LAST_NUM_LEVEL) || "1");
+
+        const v = Math.max(1, curNum - 1);
+        levelSelect.value = `level:${v}`;
+        localStorage.setItem(LS_LEVEL_SELECT, levelSelect.value);
         loadSelectedLevel();
       });
 
       btnNextLevel.addEventListener("click", () => {
         ensureBgmRunning();
-        const v = Math.min(totalLevels, Number(levelSelect.value) + 1);
-        levelSelect.value = String(v);
-        localStorage.setItem("flowmanLastLevel", String(v));
+        const sel = getSelectedLevelKind();
+
+        let curNum =
+          sel.kind === "level"
+            ? sel.level
+            : Number(localStorage.getItem(LS_LAST_NUM_LEVEL) || "1");
+
+        const v = Math.min(totalLevels, curNum + 1);
+        levelSelect.value = `level:${v}`;
+        localStorage.setItem(LS_LEVEL_SELECT, levelSelect.value);
         loadSelectedLevel();
       });
 
       levelSelect.addEventListener("change", () => {
         ensureBgmRunning();
-        localStorage.setItem("flowmanLastLevel", String(levelSelect.value));
+        localStorage.setItem(LS_LEVEL_SELECT, String(levelSelect.value));
         loadSelectedLevel();
       });
 
       playFromSelect.addEventListener("change", () => {
-        localStorage.setItem("flowmanPlayFrom", String(getPlayFrom()));
+        localStorage.setItem(LS_PLAY_FROM, String(getPlayFrom()));
         loadSelectedLevel();
       });
 
       modeSelect.addEventListener("change", () => {
         ensureBgmRunning();
-        localStorage.setItem("flowmanLastMode", String(getMode()));
+        localStorage.setItem(LS_LAST_MODE, String(getMode()));
         resetRunState();
-        btnStart.disabled = levelWords.length === 0;
+        btnStart.disabled = getPoolWordsForSelection().length === 0;
         setToast("ok", `Mode: ${getMode()}`);
       });
 

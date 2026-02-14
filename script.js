@@ -31,6 +31,8 @@ const LS_FAVORITES = "vocabFavorites";
 const LS_EXPOSED = "vocabExposed";
 const LS_FLOWMAN = "flowmanHighest";
 const LS_FLOWMAN_BADGES = "flowmanBadges_v1"; // ✅ NEW
+const LS_MOVIEFLOW = "movieflowExposure";        // per-word exposure count
+const LS_MOVIEFLOW_DAILY = "movieflowDaily";    // per-day total exposures
 
 const RANK = { unknown: 0, explored: 1, known: 2, well_known: 3 };
 const FLOW_RANK = { none: 0, easy: 1, normal: 2, hard: 3 };
@@ -100,6 +102,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   ensureTodayBucket();
   updateTodayChip();
 
+  // Periodically refresh MovieFlow chip so updates appear reliably
+  setInterval(() => {
+    try { updateMovieflowChip(); } catch (e) {}
+  }, 2000);
+
   /* =======================
      Kanji Size + Bold Controls
   ======================= */
@@ -145,6 +152,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
+// Listen for storage events so MovieFlow chip updates across windows/tabs
+window.addEventListener("storage", (e) => {
+  try {
+    if (e.key === LS_MOVIEFLOW_DAILY || e.key === LS_MOVIEFLOW) {
+      updateMovieflowChip();
+    }
+  } catch (err) {
+    // ignore
+  }
+});
+
 /* =======================
    Export / Import Core
 ======================= */
@@ -162,6 +180,8 @@ function getAllData() {
       flowmanBadges: JSON.parse(
         localStorage.getItem(LS_FLOWMAN_BADGES) || "{}"
       ), // ✅ NEW
+      movieflowExposure: localStorage.getItem(LS_MOVIEFLOW),
+      movieflowDaily: localStorage.getItem(LS_MOVIEFLOW_DAILY),
       dailyOffset: parseInt(localStorage.getItem(LS_OFFSET) || "0", 10),
     },
   };
@@ -245,6 +265,8 @@ function importDataFromObject(obj) {
   const vocabExposed = data.vocabExposed || {};
   const flowmanHighest = data.flowmanHighest || {};
   const flowmanBadges = data.flowmanBadges || {}; // ✅ NEW
+  const movieflowExposure = data.movieflowExposure;
+  const movieflowDaily = data.movieflowDaily;
   const dailyOffset = data.dailyOffset;
 
   const merge = confirm(
@@ -261,6 +283,8 @@ function importDataFromObject(obj) {
     const curBadges = JSON.parse(
       localStorage.getItem(LS_FLOWMAN_BADGES) || "{}"
     );
+    const curMovieflow = JSON.parse(localStorage.getItem(LS_MOVIEFLOW) || "{}");
+    const curMovieflowDaily = JSON.parse(localStorage.getItem(LS_MOVIEFLOW_DAILY) || "{}");
 
     localStorage.setItem(
       LS_PROGRESS,
@@ -290,6 +314,14 @@ function importDataFromObject(obj) {
       LS_FLOWMAN_BADGES,
       JSON.stringify(mergeBadges(curBadges, flowmanBadges))
     );
+    if (movieflowExposure) {
+      const inMovieflow = JSON.parse(movieflowExposure);
+      localStorage.setItem(LS_MOVIEFLOW, JSON.stringify({ ...curMovieflow, ...inMovieflow }));
+    }
+    if (movieflowDaily) {
+      const inDaily = JSON.parse(movieflowDaily);
+      localStorage.setItem(LS_MOVIEFLOW_DAILY, JSON.stringify(mergeDailyLog(curMovieflowDaily, inDaily)));
+    }
   } else {
     localStorage.setItem(LS_PROGRESS, JSON.stringify(vocabProgress));
     localStorage.setItem(LS_DAILY, JSON.stringify(vocabProgressDaily || "{}"));
@@ -298,6 +330,8 @@ function importDataFromObject(obj) {
     localStorage.setItem(LS_EXPOSED, JSON.stringify(vocabExposed));
     localStorage.setItem(LS_FLOWMAN, JSON.stringify(flowmanHighest));
     localStorage.setItem(LS_FLOWMAN_BADGES, JSON.stringify(flowmanBadges));
+    if (movieflowExposure) localStorage.setItem(LS_MOVIEFLOW, movieflowExposure);
+    if (movieflowDaily) localStorage.setItem(LS_MOVIEFLOW_DAILY, movieflowDaily);
   }
 
   if (typeof dailyOffset === "number") {
@@ -318,6 +352,7 @@ function importDataFromObject(obj) {
 
   ensureTodayBucket();
   updateTodayChip();
+  updateMovieflowChip();
   render();
   updateStats();
   alert("✅ Import complete! All progress and badges restored.");
@@ -366,7 +401,17 @@ function addDailyProgress(delta) {
 
 function updateTodayChip() {
   const log = getDailyLog();
-  todayChip.textContent = `Progress Points Today: ${log[todayKey()] || 0}`;
+  const val = log[todayKey()] || 0;
+  console.debug("updateTodayChip ->", val);
+  todayChip.textContent = `Progress Points Today: ${val}`;
+}
+
+function updateMovieflowChip() {
+  const movieflowChip = document.getElementById("movieflowChip");
+  if (!movieflowChip) return;
+  const dailyLog = JSON.parse(localStorage.getItem(LS_MOVIEFLOW_DAILY) || "{}");
+  const today = todayKey();
+  movieflowChip.textContent = `🎬 MovieFlow Exposures Today: ${dailyLog[today] || 0}`;
 }
 
 /* =======================
@@ -566,6 +611,7 @@ async function loadCSV() {
   const favs = JSON.parse(localStorage.getItem(LS_FAVORITES) || "{}");
   const exposed = JSON.parse(localStorage.getItem(LS_EXPOSED) || "{}");
   const flow = JSON.parse(localStorage.getItem(LS_FLOWMAN) || "{}");
+  const movieflowMap = JSON.parse(localStorage.getItem(LS_MOVIEFLOW) || "{}");
 
   words = parsed.data.map((r) => {
     const original = r["Original"]?.trim() || "";
@@ -588,6 +634,7 @@ async function loadCSV() {
       isFavorite: !!favs[key],
       exposedAt: exposed[key] || null,
       flowmanHighest: flow[key] || "none",
+      movieflowCount: movieflowMap[key] || 0,
     };
   });
 
@@ -707,6 +754,25 @@ function createCard(word) {
     btn.addEventListener("click", () => setFamiliarity(word.key, level));
     buttons.appendChild(btn);
   });
+
+  if (word.movieflowCount > 0) {
+    const movieflowBadge = document.createElement("div");
+    movieflowBadge.className = "movieflow-badge";
+    movieflowBadge.style.fontSize = "0.85rem";
+    movieflowBadge.style.color = "rgba(255,255,255,0.85)";
+    movieflowBadge.style.marginLeft = "8px";
+    movieflowBadge.style.alignSelf = "center";
+    movieflowBadge.textContent = `🎬 ${word.movieflowCount}x`;
+    const timesLabel = word.movieflowCount === 1 ? 'time' : 'times';
+    movieflowBadge.title = `You've seen this vocab in MovieFlow ${word.movieflowCount} ${timesLabel}`;
+    movieflowBadge.setAttribute('aria-label', movieflowBadge.title);
+    // place it next to the flow element in the title wrap
+    try {
+      titleWrap.appendChild(movieflowBadge);
+    } catch (e) {
+      card.appendChild(movieflowBadge);
+    }
+  }
 
   card.append(header, furigana, romaji, meaning, buttons);
   return card;
@@ -1030,7 +1096,7 @@ function updateStats() {
 function resetProgress() {
   if (
     confirm(
-      "Reset ALL progress, stats, points, favorites, exposed, Flowman completion, and badges? This cannot be undone."
+      "Reset ALL progress, stats, points, favorites, exposed, Flowman completion, MovieFlow, and badges? This cannot be undone."
     )
   ) {
     localStorage.removeItem(LS_PROGRESS);
@@ -1041,16 +1107,20 @@ function resetProgress() {
     localStorage.removeItem(LS_EXPOSED);
     localStorage.removeItem(LS_FLOWMAN);
     localStorage.removeItem(LS_FLOWMAN_BADGES); // ✅ NEW
+    localStorage.removeItem(LS_MOVIEFLOW);
+    localStorage.removeItem(LS_MOVIEFLOW_DAILY);
 
     words.forEach((w) => {
       w.familiarity = "unknown";
       w.isFavorite = false;
       w.exposedAt = null;
       w.flowmanHighest = "none";
+      w.movieflowCount = 0;
     });
 
     ensureTodayBucket();
     updateTodayChip();
+    updateMovieflowChip();
     render();
     updateStats();
     alert("Progress fully reset.");

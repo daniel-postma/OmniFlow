@@ -26,7 +26,14 @@
               id="openGameTop"
               href="hang.html"
               style="color: inherit; text-decoration: underline"
-              >Switch to Game Mode</a
+              >Game Mode</a
+            >
+            •
+            <a
+              id="openMovieFlowTop"
+              href="movie.html"
+              style="color: inherit; text-decoration: underline"
+              >MovieFlow</a
             >
           </div>
         </div>
@@ -50,6 +57,26 @@
             title="Open Flowman / Hangman mode"
           >
             🎮 Game Mode
+          </a>
+
+          <a
+            id="openMovieFlowBtn"
+            href="movie.html"
+            style="
+              display: inline-flex;
+              align-items: center;
+              gap: 8px;
+              padding: 10px 12px;
+              border-radius: 12px;
+              border: 1px solid rgba(255, 255, 255, 0.18);
+              background: linear-gradient(135deg, #3a3f51, #1f2230);
+              color: white;
+              font-weight: 900;
+              text-decoration: none;
+            "
+            title="Open MovieFlow immersion mode"
+          >
+            🎬 MovieFlow
           </a>
         </div>
       </div>
@@ -101,15 +128,22 @@
         <button id="toggleStats">📊 Show Stats</button>
 
         <!-- Today progress chip -->
-        <span id="todayChip" class="chip">Progress Points Today: 0</span>
+        <span id="todayChip" class="chip"> Progress Points Today: 0 </span>
+
+        <!-- MovieFlow exposure chip -->
+        <span
+          id="movieflowChip"
+          class="chip"
+          title="Total MovieFlow exposures today"
+        >
+          🎬 MovieFlow Exposures Today: 0
+        </span>
       </div>
 
-      <!-- Simple toggle button for Ko-fi widget -->
       <button id="toggleKofi" style="margin-top: 10px">
         Hide Support Widget
       </button>
 
-      <!-- Kanji appearance controls -->
       <div class="kanji-controls">
         <label for="kanjiSize">Kanji Size:</label>
         <input type="range" id="kanjiSize" min="0.9" max="2.5" step="0.1" />
@@ -128,16 +162,21 @@
     </section>
 
     <!-- Main grid for word cards -->
-    <main id="wordGrid"></main>
+    <main id="wordGrid">
+      <!--
+        Each card can now include:
+        <div class="movieflow-exposure">
+          🎬 Seen <span class="movieflow-count">3</span>x
+        </div>
+      -->
+    </main>
 
-    <!-- Pagination footer -->
     <footer>
       <button id="prevPage">Prev</button>
       <span id="pageInfo"></span>
       <button id="nextPage">Next</button>
     </footer>
 
-    <!-- Libraries + main script -->
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <script src="script.js"></script>
 
@@ -151,7 +190,6 @@
         "floating-chat.donateButton.text-color": "#fff",
       });
 
-      // Helper: find the Ko-fi widget container, even if the ID changes
       function findKofiContainer() {
         const divs = document.querySelectorAll("div[id]");
         for (const el of divs) {
@@ -168,21 +206,18 @@
         if (!toggleBtn) return;
 
         let tries = 0;
-        const maxTries = 40; // ~12 seconds at 300ms intervals
+        const maxTries = 40;
 
         const interval = setInterval(() => {
           const container = findKofiContainer();
           if (!container) {
             tries++;
-            if (tries >= maxTries) {
-              clearInterval(interval);
-            }
+            if (tries >= maxTries) clearInterval(interval);
             return;
           }
 
           clearInterval(interval);
 
-          // Load saved state
           const hidden = localStorage.getItem("kofiHidden") === "true";
           if (hidden) {
             container.style.display = "none";
@@ -193,15 +228,11 @@
 
           toggleBtn.addEventListener("click", () => {
             const isHidden = container.style.display === "none";
-            if (isHidden) {
-              container.style.display = "block";
-              toggleBtn.textContent = "Hide Support Widget";
-              localStorage.setItem("kofiHidden", "false");
-            } else {
-              container.style.display = "none";
-              toggleBtn.textContent = "Show Support Widget";
-              localStorage.setItem("kofiHidden", "true");
-            }
+            container.style.display = isHidden ? "block" : "none";
+            toggleBtn.textContent = isHidden
+              ? "Hide Support Widget"
+              : "Show Support Widget";
+            localStorage.setItem("kofiHidden", String(!isHidden));
           });
         }, 300);
       }
